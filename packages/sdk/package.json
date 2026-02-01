@@ -1,0 +1,27 @@
+{
+  "name": "minihog-sdk",
+  "version": "1.0.0",
+  "description": "JavaScript SDK for MiniHog analytics",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "analytics",
+    "tracking",
+    "sdk"
+  ],
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  }
+}
+

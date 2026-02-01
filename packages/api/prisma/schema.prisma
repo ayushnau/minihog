@@ -1,0 +1,84 @@
+// Prisma schema for MiniHog analytics engine
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Events table - stores all user events
+model Event {
+  id                    String   @id @default(cuid())
+  eventName             String   @map("event_name")
+  distinctId            String   @map("distinct_id")
+  timestamp             DateTime
+  properties            Json     @default("{}")
+  attributedCampaignId  String?  @map("attributed_campaign_id")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  @@index([eventName, timestamp])
+  @@index([distinctId])
+  @@index([timestamp])
+  @@map("events")
+}
+
+// Clicks table - stores marketing click interactions for attribution
+model Click {
+  id         String   @id @default(cuid())
+  deviceId   String   @map("device_id")
+  campaignId String   @map("campaign_id")
+  timestamp  DateTime
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([deviceId, timestamp])
+  @@index([campaignId])
+  @@map("clicks")
+}
+
+// Installs table - stores install events with attribution
+model Install {
+  id                   String   @id @default(cuid())
+  deviceId             String   @map("device_id")
+  installTime          DateTime @map("install_time")
+  attributedCampaignId String?  @map("attributed_campaign_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@index([deviceId])
+  @@index([attributedCampaignId])
+  @@index([installTime])
+  @@map("installs")
+}
+
+// Users table - stores dashboard user accounts
+model User {
+  id        String    @id @default(cuid())
+  username  String    @unique
+  email     String    @unique
+  passwordHash String @map("password_hash")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  apiKeys   ApiKey[]
+
+  @@map("users")
+}
+
+// API Keys table - stores API keys for users
+model ApiKey {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  key       String   @unique
+  name      String
+  lastUsed  DateTime? @map("last_used")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([key])
+  @@map("api_keys")
+}
+
