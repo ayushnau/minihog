@@ -5,13 +5,13 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 // Users table - stores dashboard user accounts
 model User {
-  id        String    @id @default(cuid())
+  id        String    @id @default(uuid())
   username  String    @unique
   email     String    @unique
   passwordHash String @map("password_hash")
@@ -25,7 +25,7 @@ model User {
 
 // API Keys table - stores API keys for users
 model ApiKey {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   userId    String   @map("user_id")
   key       String   @unique
   name      String
@@ -38,4 +38,5 @@ model ApiKey {
   @@index([key])
   @@map("api_keys")
 }
+
 

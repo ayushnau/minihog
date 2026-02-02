@@ -5,13 +5,13 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 // Events table - stores all user events
 model Event {
-  id                    String   @id @default(cuid())
+  id                    String   @id @default(uuid())
   eventName             String   @map("event_name")
   distinctId            String   @map("distinct_id")
   timestamp             DateTime
@@ -27,7 +27,7 @@ model Event {
 
 // Clicks table - stores marketing click interactions for attribution
 model Click {
-  id         String   @id @default(cuid())
+  id         String   @id @default(uuid())
   deviceId   String   @map("device_id")
   campaignId String   @map("campaign_id")
   timestamp  DateTime
@@ -40,7 +40,7 @@ model Click {
 
 // Installs table - stores install events with attribution
 model Install {
-  id                   String   @id @default(cuid())
+  id                   String   @id @default(uuid())
   deviceId             String   @map("device_id")
   installTime          DateTime @map("install_time")
   attributedCampaignId String?  @map("attributed_campaign_id")
@@ -54,7 +54,7 @@ model Install {
 
 // Users table - stores dashboard user accounts
 model User {
-  id        String    @id @default(cuid())
+  id        String    @id @default(uuid())
   username  String    @unique
   email     String    @unique
   passwordHash String @map("password_hash")
@@ -68,7 +68,7 @@ model User {
 
 // API Keys table - stores API keys for users
 model ApiKey {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   userId    String   @map("user_id")
   key       String   @unique
   name      String

@@ -158,3 +158,4 @@ export default miniHog;
 // Also export class for advanced usage
 export { MiniHog };
 
+

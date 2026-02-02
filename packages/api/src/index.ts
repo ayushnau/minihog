@@ -9,17 +9,24 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 dotenv.config();
 
+// Create Express app (shared for both local dev and Vercel)
 const app = express();
-const PORT = process.env.PORT || 3000;
 const ATTRIBUTION_WINDOW_HOURS = parseInt(process.env.ATTRIBUTION_WINDOW_HOURS || '24', 10);
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  credentials: true,
+}));
 app.use(express.json());
 
-// Health check
+// Health check (no database dependency)
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    database: process.env.DATABASE_URL ? 'configured' : 'not configured'
+  });
 });
 
 // Routes
@@ -34,10 +41,14 @@ app.use(notFoundHandler);
 // Global error handler (must be last)
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`MiniHog API server running on port ${PORT}`);
-  console.log(`Attribution window: ${ATTRIBUTION_WINDOW_HOURS} hours`);
-});
+// Only start server if running locally (not in Vercel)
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`MiniHog API server running on port ${PORT}`);
+    console.log(`Attribution window: ${ATTRIBUTION_WINDOW_HOURS} hours`);
+  });
+}
 
 export { ATTRIBUTION_WINDOW_HOURS };
 export default app;

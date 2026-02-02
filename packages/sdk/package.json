@@ -1,27 +1,47 @@
 {
   "name": "minihog-sdk",
   "version": "1.0.0",
-  "description": "JavaScript SDK for MiniHog analytics",
+  "description": "JavaScript SDK for MiniHog analytics - track events, funnels, retention, and attribution",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "module": "./dist/index.js",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "lint": "eslint src --ext .ts",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "analytics",
     "tracking",
-    "sdk"
+    "sdk",
+    "events",
+    "funnel",
+    "retention",
+    "attribution",
+    "posthog",
+    "minihog"
   ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/posthog.git",
+    "directory": "packages/sdk"
+  },
   "dependencies": {},
   "devDependencies": {
     "@types/node": "^20.10.0",
     "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
+
 

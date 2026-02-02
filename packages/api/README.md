@@ -41,3 +41,4 @@ Uses Prisma ORM with PostgreSQL. Schema is defined in `prisma/schema.prisma`.
 - `npm run db:studio` - Open Prisma Studio
 - `npm run db:migrate` - Run database migrations
 
+
