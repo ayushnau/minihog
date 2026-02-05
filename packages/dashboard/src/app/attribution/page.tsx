@@ -54,21 +54,21 @@ export default function AttributionPage() {
 
       {loading && (
         <div className="flex items-center justify-center h-64">
-          <div className="text-gray-500">Loading attribution data...</div>
+          <div className="text-gray-500 dark:text-gray-400">Loading attribution data...</div>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800">{error}</p>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
+          <p className="text-red-800 dark:text-red-200">{error}</p>
         </div>
       )}
 
       {data && !loading && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <h3 className="text-lg font-semibold mb-4">Installs by Campaign</h3>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Installs by Campaign</h3>
               {installChartData.length > 0 ? (
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -92,12 +92,12 @@ export default function AttributionPage() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-8">No install data available</p>
+                <p className="text-gray-500 dark:text-gray-400 text-center py-8">No install data available</p>
               )}
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <h3 className="text-lg font-semibold mb-4">Purchases by Campaign</h3>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Purchases by Campaign</h3>
               {purchaseChartData.length > 0 ? (
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -111,34 +111,34 @@ export default function AttributionPage() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-8">No purchase data available</p>
+                <p className="text-gray-500 dark:text-gray-400 text-center py-8">No purchase data available</p>
               )}
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold mb-4">Campaign Details</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Campaign Details</h3>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Campaign</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Installs</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchases</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Campaign</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Installs</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Purchases</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {data.installs_by_campaign.map((item, index) => {
                     const purchase = data.purchases_by_campaign.find(p => p.campaign_id === item.campaign_id);
                     return (
                       <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                           {item.campaign_id || 'Unattributed'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {item.install_count || 0}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {purchase?.purchase_count || 0}
                         </td>
                       </tr>
@@ -146,7 +146,7 @@ export default function AttributionPage() {
                   })}
                   {data.installs_by_campaign.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan={3} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                         No campaign data available
                       </td>
                     </tr>

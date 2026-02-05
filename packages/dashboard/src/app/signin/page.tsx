@@ -33,8 +33,8 @@ export default function SignInPage() {
 
         const data = await response.json();
         if (response.ok) {
-          router.push('/dashboard');
-          router.refresh();
+          // Force a full page reload to refresh auth state
+          window.location.href = '/dashboard';
         } else {
           setError(data.error || 'Invalid username or password');
         }
@@ -58,7 +58,8 @@ export default function SignInPage() {
           });
 
           if (loginResponse.ok) {
-            router.push('/dashboard');
+            // Force a full page reload to refresh auth state
+            window.location.href = '/dashboard';
           } else {
             setError('Registration successful. Please log in.');
             setIsLogin(true);

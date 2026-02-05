@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { useAuth } from '@/lib/useAuth';
 import { DarkModeToggle } from './DarkModeToggle';
 
 const navItems = [
+  { href: '/', label: 'Documentation' },
   { href: '/dashboard', label: 'Overview' },
   { href: '/events', label: 'Events' },
   { href: '/funnel', label: 'Funnel' },
@@ -19,7 +21,7 @@ export function Navigation() {
   const pathname = usePathname();
   const { user, loading, logout } = useAuth();
   const router = useRouter();
-  const isPublicPage = pathname === '/' || pathname === '/signin';
+  const isPublicPage = pathname === '/signin';
 
   const handleLogout = async () => {
     await logout();
@@ -68,7 +70,7 @@ export function Navigation() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-8">
-            <Link href="/dashboard" className="text-xl font-bold text-primary-600 dark:text-primary-400">
+            <Link href="/" className="text-xl font-bold text-primary-600 dark:text-primary-400">
               MiniHog
             </Link>
             <div className="flex space-x-4">

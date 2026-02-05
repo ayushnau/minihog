@@ -57,14 +57,14 @@ export default function FunnelPage() {
       
       <DateRangePicker onDateChange={handleDateChange} />
       
-      <div className="bg-white p-4 rounded-lg shadow-sm border mb-6">
-        <label className="text-sm font-medium text-gray-700 mr-4">Funnel Steps (comma-separated):</label>
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-4">Funnel Steps (comma-separated):</label>
         <input
           type="text"
           value={steps}
           onChange={(e) => setSteps(e.target.value)}
           placeholder="e.g., install,signup,purchase"
-          className="border rounded px-3 py-1 text-sm flex-1 min-w-[300px]"
+          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-sm flex-1 min-w-[300px] bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
         />
         <button
           onClick={loadData}
@@ -76,21 +76,21 @@ export default function FunnelPage() {
 
       {loading && (
         <div className="flex items-center justify-center h-64">
-          <div className="text-gray-500">Loading funnel data...</div>
+          <div className="text-gray-500 dark:text-gray-400">Loading funnel data...</div>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800">{error}</p>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
+          <p className="text-red-800 dark:text-red-200">{error}</p>
         </div>
       )}
 
-      {data && !loading && (
+      {!error && !loading && data && (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <h3 className="text-lg font-semibold mb-4">Funnel Visualization</h3>
-            <p className="text-sm text-gray-500 mb-4">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Funnel Visualization</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               Total users at first step: {data.total_users_at_first_step.toLocaleString()}
             </p>
             <div className="h-96">
@@ -107,17 +107,17 @@ export default function FunnelPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold mb-4">Funnel Steps</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Funnel Steps</h3>
             <div className="space-y-4">
               {data.funnel.map((step, index) => (
-                <div key={step.step} className="flex items-center justify-between p-4 bg-gray-50 rounded">
+                <div key={step.step} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded">
                   <div>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-gray-900 dark:text-white">
                       Step {step.step}: {step.event_name}
                     </p>
                     {index > 0 && (
-                      <p className="text-sm text-red-600">
+                      <p className="text-sm text-red-600 dark:text-red-400">
                         Drop-off: {step.drop_off_percentage.toFixed(2)}%
                       </p>
                     )}
@@ -129,6 +129,12 @@ export default function FunnelPage() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {!error && !loading && !data && (
+        <div className="text-center py-12">
+          <p className="text-gray-500 dark:text-gray-400">No funnel data available for the selected criteria.</p>
         </div>
       )}
       </div>

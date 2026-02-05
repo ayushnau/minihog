@@ -98,13 +98,17 @@ export default function LandingPage() {
 import MiniHog from 'minihog-sdk';
 
 MiniHog.init({
-  endpoint: 'https://api.minihog.dev',
+  environment: 'production', // 'production' | 'sandbox' | 'development'
   apiKey: 'your-api-key'
 });
 
 MiniHog.track('app_open');
 MiniHog.track('purchase', { amount: 299 });`}
                   </pre>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                    The SDK automatically uses the correct API endpoint based on the environment. 
+                    No need to specify the endpoint URL manually.
+                  </p>
                 </div>
               }
             />
