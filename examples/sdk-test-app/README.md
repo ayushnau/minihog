@@ -37,6 +37,8 @@ The app will be available at `http://localhost:3001` (or next available port)
 
 - ✅ Initialize SDK with different environments
 - ✅ Track events with custom properties
+- ✅ Track page views, button clicks, form submissions, and other interactions
+- ✅ Track events with button IDs, page paths, and contextual information
 - ✅ Manual flush events
 - ✅ View event logs
 - ✅ Quick test buttons for common events

@@ -36,14 +36,31 @@ console.log(`
     product_id: 'prod_123'
   });
   
-  // Track page views with page name (for user behavior analysis)
+  // Track page views (for user behavior analysis)
   MiniHog.track('page_view', { page: '/home' });
-  MiniHog.track('page_view', { page: '/pricing' });
+  MiniHog.track('page_view', { page: '/pricing', page_title: 'Pricing Page' });
   
-  // Track button clicks with page and button name
+  // Track button clicks with button IDs and page context
   MiniHog.track('button_click', { 
     page: '/home',
-    button_name: 'signup' 
+    button_id: 'signup-btn',
+    button_name: 'signup',
+    button_text: 'Sign Up Now'
+  });
+  
+  // Track form submissions with form IDs
+  MiniHog.track('form_submit', { 
+    page: '/contact',
+    form_id: 'contact-form',
+    form_name: 'Contact Form'
+  });
+  
+  // Track link clicks with link IDs
+  MiniHog.track('link_click', { 
+    page: '/blog',
+    link_id: 'read-more-link',
+    link_url: '/blog/article-1',
+    link_text: 'Read More'
   });
   
   // Track user actions with properties
@@ -58,6 +75,13 @@ console.log(`
     amount: 299,
     currency: 'USD',
     product_id: 'prod_123'
+  });
+  
+  // Track other custom events
+  MiniHog.track('video_play', {
+    page: '/tutorials',
+    video_id: 'tutorial-1',
+    video_title: 'Getting Started'
   });
 `);
 

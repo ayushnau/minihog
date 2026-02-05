@@ -62,9 +62,63 @@ Track a user event. Requires API key authentication via `X-API-Key` header.
   "timestamp": 1706352000000,
   "properties": {
     "amount": 299,
-    "currency": "INR"
+    "currency": "INR",
+    "page": "/checkout"
   },
   "event_id": "optional-id-for-idempotency"
+}
+```
+
+**Example: Tracking Page Views**
+```json
+{
+  "event": "page_view",
+  "distinct_id": "user_123",
+  "properties": {
+    "page": "/home",
+    "page_title": "Homepage"
+  }
+}
+```
+
+**Example: Tracking Button Clicks with IDs**
+```json
+{
+  "event": "button_click",
+  "distinct_id": "user_123",
+  "properties": {
+    "page": "/home",
+    "button_id": "signup-btn",
+    "button_name": "signup",
+    "button_text": "Sign Up Now"
+  }
+}
+```
+
+**Example: Tracking Form Submissions**
+```json
+{
+  "event": "form_submit",
+  "distinct_id": "user_123",
+  "properties": {
+    "page": "/contact",
+    "form_id": "contact-form",
+    "form_name": "Contact Form"
+  }
+}
+```
+
+**Example: Tracking Link Clicks**
+```json
+{
+  "event": "link_click",
+  "distinct_id": "user_123",
+  "properties": {
+    "page": "/blog",
+    "link_id": "read-more-link",
+    "link_url": "/blog/article-1",
+    "link_text": "Read More"
+  }
 }
 ```
 

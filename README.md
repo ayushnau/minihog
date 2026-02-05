@@ -169,13 +169,29 @@ MiniHog.init({
 MiniHog.track('page_view', { page: '/home' });
 MiniHog.track('page_view', { page: '/pricing' });
 
-// Track button clicks with page context
+// Track button clicks with button IDs and page context
 MiniHog.track('button_click', { 
   page: '/home',
-  button_name: 'signup' 
+  button_id: 'signup-btn',
+  button_name: 'signup',
+  button_text: 'Sign Up Now'
 });
 
-// Track conversions
+// Track other interactive events (form submissions, link clicks, etc.)
+MiniHog.track('form_submit', { 
+  page: '/contact',
+  form_id: 'contact-form',
+  form_name: 'Contact Form'
+});
+
+MiniHog.track('link_click', { 
+  page: '/blog',
+  link_id: 'read-more-link',
+  link_url: '/blog/article-1',
+  link_text: 'Read More'
+});
+
+// Track conversions with page and event context
 MiniHog.track('signup', { page: '/signup', plan: 'premium' });
 MiniHog.track('purchase', { page: '/checkout', amount: 299, currency: 'INR' });
 
@@ -193,6 +209,8 @@ See [packages/sdk/README.md](./packages/sdk/README.md) for full documentation.
 - **Retry logic** - Failed requests are retried with exponential backoff
 - **Session management** - Distinct IDs are generated and persisted
 - **Auto-flush** - Events are flushed on page unload or interval
+- **Flexible event tracking** - Track page views, button clicks, form submissions, link clicks, and any custom events
+- **Rich context** - Include page paths, button IDs, form IDs, and other contextual information with all events
 
 ## 🎯 Attribution Logic
 
