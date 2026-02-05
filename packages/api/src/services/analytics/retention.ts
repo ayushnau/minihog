@@ -8,6 +8,7 @@ import { prisma } from '../../db/client';
  * @param from - Start date for cohort
  * @param to - End date for cohort
  * @param apiKeyIds - Optional array of API key IDs to filter by (for user-specific data)
+ * @param userId - Optional user ID to filter by (for data persistence after key revocation)
  * 
  * Returns the percentage of users who performed any event N days after their cohort event
  */
@@ -16,13 +17,14 @@ export async function getRetentionAnalysis(
   day: number,
   from: Date,
   to: Date,
-  apiKeyIds?: string[]
+  apiKeyIds?: string[],
+  userId?: string
 ): Promise<{
   cohort_size: number;
   retained_users: number;
   retention_percentage: number;
 }> {
-  // Build where clause with optional API key filter
+  // Build where clause with optional API key or user filter
   const baseWhereClause: any = {
     timestamp: {
       gte: from,
@@ -30,23 +32,56 @@ export async function getRetentionAnalysis(
     },
   };
 
-  if (apiKeyIds && apiKeyIds.length > 0) {
+  // Filter by userId (primary) OR apiKeyIds (fallback)
+  // Handle missing userId column gracefully until migration is applied
+  let useUserId = false;
+  if (userId) {
+    baseWhereClause.userId = userId;
+    useUserId = true;
+  } else if (apiKeyIds && apiKeyIds.length > 0) {
     baseWhereClause.apiKeyId = {
       in: apiKeyIds,
     };
   }
 
-  // Get all users who performed the cohort event in the date range
-  const cohortEvents = await prisma.event.findMany({
-    where: {
-      eventName: cohortEvent,
-      ...baseWhereClause,
-    },
-    select: {
-      distinctId: true,
-      timestamp: true,
-    },
-  });
+  // Get all users who performed the cohort event in the date range - handle missing userId column
+  let cohortEvents: any[];
+  try {
+    cohortEvents = await prisma.event.findMany({
+      where: {
+        eventName: cohortEvent,
+        ...baseWhereClause,
+      },
+      select: {
+        distinctId: true,
+        timestamp: true,
+      },
+    });
+  } catch (error: any) {
+    // If userId column doesn't exist, fall back to apiKeyIds filtering
+    if (error.code === 'P2022' && error.meta?.column?.includes('user_id') && useUserId && apiKeyIds && apiKeyIds.length > 0) {
+      const fallbackWhere: any = {
+        eventName: cohortEvent,
+        timestamp: {
+          gte: from,
+          lte: to,
+        },
+        apiKeyId: {
+          in: apiKeyIds,
+        },
+      };
+      
+      cohortEvents = await prisma.event.findMany({
+        where: fallbackWhere,
+        select: {
+          distinctId: true,
+          timestamp: true,
+        },
+      });
+    } else {
+      throw error;
+    }
+  }
 
   const cohortSize = new Set(cohortEvents.map(e => e.distinctId)).size;
 

@@ -9,6 +9,11 @@ export async function GET(request: NextRequest) {
     const event = searchParams.get('event');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
+    const includeTimeSeries = searchParams.get('include_time_series');
+    const includeProperties = searchParams.get('include_properties');
+    const includeJourneys = searchParams.get('include_journeys');
+    const propertyKey = searchParams.get('property_key');
+    const granularity = searchParams.get('granularity');
 
     // Get JWT token from cookie
     const token = request.cookies.get('auth-token')?.value;
@@ -25,6 +30,11 @@ export async function GET(request: NextRequest) {
     if (event) url.searchParams.set('event', event);
     if (from) url.searchParams.set('from', from);
     if (to) url.searchParams.set('to', to);
+    if (includeTimeSeries) url.searchParams.set('include_time_series', includeTimeSeries);
+    if (includeProperties) url.searchParams.set('include_properties', includeProperties);
+    if (includeJourneys) url.searchParams.set('include_journeys', includeJourneys);
+    if (propertyKey) url.searchParams.set('property_key', propertyKey);
+    if (granularity) url.searchParams.set('granularity', granularity);
 
     const response = await fetch(url.toString(), {
       method: 'GET',

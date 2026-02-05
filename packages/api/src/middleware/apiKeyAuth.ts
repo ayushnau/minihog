@@ -40,15 +40,32 @@ export async function validateApiKey(
       });
     }
 
-    // Validate API key exists
-    const keyRecord = await prisma.apiKey.findUnique({
+    // Validate API key exists and is active (not revoked)
+    const keyRecord = await (prisma.apiKey as any).findUnique({
       where: { key: apiKey },
+      select: {
+        id: true,
+        userId: true,
+        key: true,
+        name: true,
+        lastUsed: true,
+        createdAt: true,
+        deletedAt: true, // Migration applied - column exists now
+      },
     });
+    
+    // Check if key is revoked (deletedAt is set)
+    if (keyRecord && keyRecord.deletedAt) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid or revoked API key',
+      });
+    }
 
     if (!keyRecord) {
       return res.status(401).json({
         success: false,
-        error: 'Invalid API key',
+        error: 'Invalid or revoked API key',
       });
     }
 
@@ -96,10 +113,24 @@ export async function optionalApiKeyAuth(
     }
 
     if (apiKey) {
-      const keyRecord = await prisma.apiKey.findUnique({
+      const keyRecord = await (prisma.apiKey as any).findUnique({
         where: { key: apiKey },
+        select: {
+          id: true,
+          userId: true,
+          key: true,
+          name: true,
+          lastUsed: true,
+          createdAt: true,
+          deletedAt: true, // Migration applied - column exists now
+        },
       });
-
+      
+      // Skip if key is revoked
+      if (keyRecord && keyRecord.deletedAt) {
+        return next(); // Skip revoked keys
+      }
+      
       if (keyRecord) {
         await prisma.apiKey.update({
           where: { id: keyRecord.id },

@@ -10,12 +10,14 @@ import { prisma } from '../../db/client';
  * 
  * Returns drop-off percentages between steps
  * @param apiKeyIds - Optional array of API key IDs to filter by (for user-specific data)
+ * @param userId - Optional user ID to filter by (for data persistence after key revocation)
  */
 export async function getFunnelAnalysis(
   steps: string[],
   from: Date,
   to: Date,
-  apiKeyIds?: string[]
+  apiKeyIds?: string[],
+  userId?: string
 ): Promise<{
   funnel: Array<{
     step: number;
@@ -32,7 +34,7 @@ export async function getFunnelAnalysis(
     };
   }
 
-  // Build where clause with optional API key filter
+  // Build where clause with optional API key or user filter
   const baseWhereClause: any = {
     timestamp: {
       gte: from,
@@ -40,23 +42,56 @@ export async function getFunnelAnalysis(
     },
   };
 
-  if (apiKeyIds && apiKeyIds.length > 0) {
+  // Filter by userId (primary) OR apiKeyIds (fallback)
+  // Handle missing userId column gracefully until migration is applied
+  let useUserId = false;
+  if (userId) {
+    baseWhereClause.userId = userId;
+    useUserId = true;
+  } else if (apiKeyIds && apiKeyIds.length > 0) {
     baseWhereClause.apiKeyId = {
       in: apiKeyIds,
     };
   }
 
-  // Step 1: Get all users who completed the first event
-  const firstStepUsers = await prisma.event.findMany({
-    where: {
-      eventName: steps[0],
-      ...baseWhereClause,
-    },
-    select: {
-      distinctId: true,
-      timestamp: true,
-    },
-  });
+  // Step 1: Get all users who completed the first event - handle missing userId column
+  let firstStepUsers: any[];
+  try {
+    firstStepUsers = await prisma.event.findMany({
+      where: {
+        eventName: steps[0],
+        ...baseWhereClause,
+      },
+      select: {
+        distinctId: true,
+        timestamp: true,
+      },
+    });
+  } catch (error: any) {
+    // If userId column doesn't exist, fall back to apiKeyIds filtering
+    if (error.code === 'P2022' && error.meta?.column?.includes('user_id') && useUserId && apiKeyIds && apiKeyIds.length > 0) {
+      const fallbackWhere: any = {
+        eventName: steps[0],
+        timestamp: {
+          gte: from,
+          lte: to,
+        },
+        apiKeyId: {
+          in: apiKeyIds,
+        },
+      };
+      
+      firstStepUsers = await prisma.event.findMany({
+        where: fallbackWhere,
+        select: {
+          distinctId: true,
+          timestamp: true,
+        },
+      });
+    } else {
+      throw error;
+    }
+  }
 
   const firstStepUserIds = new Set(firstStepUsers.map(e => e.distinctId));
   const totalUsersAtFirstStep = firstStepUserIds.size;
@@ -91,20 +126,50 @@ export async function getFunnelAnalysis(
     const currentStep = steps[i];
     const currentStepUsers = new Map<string, Date>();
 
-    // Get all events for current step
-    const currentStepEvents = await prisma.event.findMany({
-      where: {
-        eventName: currentStep,
-        distinctId: {
-          in: Array.from(previousStepUsers.keys()),
+    // Get all events for current step - handle missing userId column
+    let currentStepEvents: any[];
+    try {
+      currentStepEvents = await prisma.event.findMany({
+        where: {
+          eventName: currentStep,
+          distinctId: {
+            in: Array.from(previousStepUsers.keys()),
+          },
+          ...baseWhereClause,
         },
-        ...baseWhereClause,
-      },
-      select: {
-        distinctId: true,
-        timestamp: true,
-      },
-    });
+        select: {
+          distinctId: true,
+          timestamp: true,
+        },
+      });
+    } catch (error: any) {
+      // If userId column doesn't exist, fall back to apiKeyIds filtering
+      if (error.code === 'P2022' && error.meta?.column?.includes('user_id') && useUserId && apiKeyIds && apiKeyIds.length > 0) {
+        const fallbackWhere: any = {
+          eventName: currentStep,
+          distinctId: {
+            in: Array.from(previousStepUsers.keys()),
+          },
+          timestamp: {
+            gte: from,
+            lte: to,
+          },
+          apiKeyId: {
+            in: apiKeyIds,
+          },
+        };
+        
+        currentStepEvents = await prisma.event.findMany({
+          where: fallbackWhere,
+          select: {
+            distinctId: true,
+            timestamp: true,
+          },
+        });
+      } else {
+        throw error;
+      }
+    }
 
     // Filter: user must have completed previous step AND current step
     // Current step must occur after previous step

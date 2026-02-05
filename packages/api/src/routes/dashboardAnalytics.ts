@@ -4,6 +4,9 @@ import { validateJWT } from '../middleware/jwtAuth';
 import { getEventCounts } from '../services/analytics/eventCount';
 import { getFunnelAnalysis } from '../services/analytics/funnel';
 import { getRetentionAnalysis } from '../services/analytics/retention';
+import { getEventTimeSeries } from '../services/analytics/timeSeries';
+import { getEventPropertiesBreakdown, getAvailablePropertyKeys } from '../services/analytics/propertiesBreakdown';
+import { getUserJourneys, getCommonUserPaths } from '../services/analytics/userJourney';
 import { prisma } from '../db/client';
 
 const router = Router();
@@ -13,7 +16,11 @@ router.use(validateJWT);
 
 /**
  * GET /dashboard/analytics/events
- * Returns event count and unique users for a given event
+ * Returns comprehensive event analytics including:
+ * - Total count and unique users
+ * - Time series data (daily/hourly)
+ * - Properties breakdown (by page, etc.)
+ * - User journeys
  * Filtered by the authenticated user's API keys
  */
 router.get('/events', async (req: Request, res: Response, next: NextFunction) => {
@@ -22,34 +29,75 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
       event: z.string().min(1),
       from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
       to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      include_time_series: z.string().optional().transform(val => val === 'true'),
+      include_properties: z.string().optional().transform(val => val === 'true'),
+      include_journeys: z.string().optional().transform(val => val === 'true'),
+      property_key: z.string().optional(), // e.g., 'page' for page breakdown
+      granularity: z.enum(['day', 'hour']).optional().default('day'),
     });
 
     const params = schema.parse(req.query);
     const apiKeyIds = (req as any).apiKeyIds || [];
-
-    // If user has no API keys, return empty results
-    if (apiKeyIds.length === 0) {
-      return res.json({
-        success: true,
-        event: params.event,
-        from: params.from ? new Date(params.from).toISOString() : new Date(0).toISOString(),
-        to: params.to ? new Date(params.to + 'T23:59:59.999Z').toISOString() : new Date().toISOString(),
-        total_count: 0,
-        unique_users: 0,
-      });
-    }
+    const requestUserId = (req as any).userId;
 
     const fromDate = params.from ? new Date(params.from) : new Date(0);
     const toDate = params.to ? new Date(params.to + 'T23:59:59.999Z') : new Date();
 
-    const result = await getEventCounts(params.event, fromDate, toDate, apiKeyIds);
+    // Use userId for data persistence after key revocation
+    // Migration has been applied - columns exist now
+    const userIdToUse = requestUserId;
+
+    // Get basic event counts (using apiKeyIds only until migration is done)
+    const counts = await getEventCounts(params.event, fromDate, toDate, apiKeyIds, userIdToUse);
+
+    // Get time series data if requested
+    const timeSeries = params.include_time_series
+      ? await getEventTimeSeries(params.event, fromDate, toDate, apiKeyIds, userIdToUse, params.granularity)
+      : [];
+
+    // Get properties breakdown if requested
+    let propertiesBreakdown: any[] = [];
+    let availableProperties: string[] = [];
+    
+    if (params.include_properties) {
+      // Get available property keys
+      availableProperties = await getAvailablePropertyKeys(params.event, fromDate, toDate, apiKeyIds, userIdToUse);
+      
+      // Get breakdown for specific property key (default to 'page' if not specified)
+      const propertyKey = params.property_key || 'page';
+      if (availableProperties.includes(propertyKey)) {
+        propertiesBreakdown = await getEventPropertiesBreakdown(
+          params.event,
+          fromDate,
+          toDate,
+          propertyKey,
+          apiKeyIds,
+          userIdToUse
+        );
+      }
+    }
+
+    // Get user journeys if requested
+    let userJourneys: any[] = [];
+    let commonPaths: any[] = [];
+    
+    if (params.include_journeys) {
+      userJourneys = await getUserJourneys(fromDate, toDate, apiKeyIds, userIdToUse, 20);
+      commonPaths = await getCommonUserPaths(fromDate, toDate, apiKeyIds, userIdToUse, 2, 10);
+    }
 
     res.json({
       success: true,
       event: params.event,
       from: fromDate.toISOString(),
       to: toDate.toISOString(),
-      ...result,
+      total_count: counts.total_count,
+      unique_users: counts.unique_users,
+      time_series: timeSeries,
+      properties_breakdown: propertiesBreakdown,
+      available_properties: availableProperties,
+      user_journeys: userJourneys,
+      common_paths: commonPaths,
     });
   } catch (error) {
     next(error);
@@ -71,6 +119,7 @@ router.get('/funnel', async (req: Request, res: Response, next: NextFunction) =>
 
     const params = schema.parse(req.query);
     const apiKeyIds = (req as any).apiKeyIds || [];
+    const requestUserId = (req as any).userId;
     const steps = params.steps.split(',').map(s => s.trim()).filter(Boolean);
 
     if (steps.length < 2) {
@@ -80,24 +129,12 @@ router.get('/funnel', async (req: Request, res: Response, next: NextFunction) =>
       });
     }
 
-    // If user has no API keys, return empty results
-    if (apiKeyIds.length === 0) {
-      const fromDate = params.from ? new Date(params.from) : new Date(0);
-      const toDate = params.to ? new Date(params.to + 'T23:59:59.999Z') : new Date();
-      return res.json({
-        success: true,
-        steps,
-        from: fromDate.toISOString(),
-        to: toDate.toISOString(),
-        funnel: [],
-        total_users_at_first_step: 0,
-      });
-    }
-
     const fromDate = params.from ? new Date(params.from) : new Date(0);
     const toDate = params.to ? new Date(params.to + 'T23:59:59.999Z') : new Date();
 
-    const result = await getFunnelAnalysis(steps, fromDate, toDate, apiKeyIds);
+    // Use userId for data persistence after key revocation
+    const userIdToUse = requestUserId;
+    const result = await getFunnelAnalysis(steps, fromDate, toDate, apiKeyIds, userIdToUse);
 
     res.json({
       success: true,
@@ -127,32 +164,20 @@ router.get('/retention', async (req: Request, res: Response, next: NextFunction)
 
     const params = schema.parse(req.query);
     const apiKeyIds = (req as any).apiKeyIds || [];
-
-    // If user has no API keys, return empty results
-    if (apiKeyIds.length === 0) {
-      const fromDate = params.from ? new Date(params.from) : new Date(0);
-      const toDate = params.to ? new Date(params.to + 'T23:59:59.999Z') : new Date();
-      return res.json({
-        success: true,
-        cohort: params.cohort,
-        day: params.day,
-        from: fromDate.toISOString(),
-        to: toDate.toISOString(),
-        cohort_size: 0,
-        retained_users: 0,
-        retention_percentage: 0,
-      });
-    }
+    const requestUserId = (req as any).userId;
 
     const fromDate = params.from ? new Date(params.from) : new Date(0);
     const toDate = params.to ? new Date(params.to + 'T23:59:59.999Z') : new Date();
 
+    // Use userId for data persistence after key revocation
+    const userIdToUse = requestUserId;
     const result = await getRetentionAnalysis(
       params.cohort,
       params.day,
       fromDate,
       toDate,
-      apiKeyIds
+      apiKeyIds,
+      userIdToUse
     );
 
     res.json({
@@ -176,14 +201,29 @@ router.get('/retention', async (req: Request, res: Response, next: NextFunction)
 router.get('/attribution', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const apiKeyIds = (req as any).apiKeyIds || [];
+    const requestUserId = (req as any).userId;
+
+    // Build where clause for attribution
+    const installWhere: any = {
+      eventName: 'install',
+    };
+    const purchaseWhere: any = {
+      eventName: 'purchase',
+    };
+
+    // Filter by userId (primary) OR apiKeyIds (fallback)
+    if (requestUserId) {
+      installWhere.userId = requestUserId;
+      purchaseWhere.userId = requestUserId;
+    } else if (apiKeyIds.length > 0) {
+      installWhere.apiKeyId = { in: apiKeyIds };
+      purchaseWhere.apiKeyId = { in: apiKeyIds };
+    }
 
     // Get installs by campaign (filtered by API keys)
     const installsByCampaign = await prisma.event.groupBy({
       by: ['attributedCampaignId'],
-      where: {
-        eventName: 'install',
-        apiKeyId: apiKeyIds.length > 0 ? { in: apiKeyIds } : undefined,
-      },
+      where: installWhere,
       _count: {
         id: true,
       },
@@ -192,10 +232,7 @@ router.get('/attribution', async (req: Request, res: Response, next: NextFunctio
     // Get purchases by campaign (filtered by API keys)
     const purchasesByCampaign = await prisma.event.groupBy({
       by: ['attributedCampaignId'],
-      where: {
-        eventName: 'purchase',
-        apiKeyId: apiKeyIds.length > 0 ? { in: apiKeyIds } : undefined,
-      },
+      where: purchaseWhere,
       _count: {
         id: true,
       },
@@ -205,11 +242,11 @@ router.get('/attribution', async (req: Request, res: Response, next: NextFunctio
       success: true,
       installs_by_campaign: installsByCampaign.map(item => ({
         campaign_id: item.attributedCampaignId,
-        install_count: item._count.id,
+        install_count: item._count?.id || 0,
       })),
       purchases_by_campaign: purchasesByCampaign.map(item => ({
         campaign_id: item.attributedCampaignId,
-        purchase_count: item._count.id,
+        purchase_count: item._count?.id || 0,
       })),
     });
   } catch (error) {

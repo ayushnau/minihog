@@ -165,9 +165,19 @@ MiniHog.init({
   flushInterval: 5000,
 });
 
-// Track events
-MiniHog.track('app_open');
-MiniHog.track('purchase', { amount: 299, currency: 'INR' });
+// Track page views (for user behavior analysis)
+MiniHog.track('page_view', { page: '/home' });
+MiniHog.track('page_view', { page: '/pricing' });
+
+// Track button clicks with page context
+MiniHog.track('button_click', { 
+  page: '/home',
+  button_name: 'signup' 
+});
+
+// Track conversions
+MiniHog.track('signup', { page: '/signup', plan: 'premium' });
+MiniHog.track('purchase', { page: '/checkout', amount: 299, currency: 'INR' });
 
 // Manually flush (events are auto-flushed on interval or page unload)
 MiniHog.flush();

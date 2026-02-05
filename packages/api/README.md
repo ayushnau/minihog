@@ -135,7 +135,24 @@ Returns attribution analytics (installs and purchases per campaign).
 These endpoints are used by the dashboard and require JWT authentication. They automatically filter data by the authenticated user's API keys.
 
 #### `GET /dashboard/analytics/events?event=purchase&from=2026-01-01&to=2026-01-07`
-User-specific event counts.
+User-specific event analytics with comprehensive insights.
+
+**Query Parameters:**
+- `event` (required) - Event name to analyze
+- `from` (optional) - Start date (YYYY-MM-DD)
+- `to` (optional) - End date (YYYY-MM-DD)
+- `include_time_series` (optional) - Include time series data (true/false)
+- `include_properties` (optional) - Include properties breakdown (true/false)
+- `include_journeys` (optional) - Include user journeys (true/false)
+- `property_key` (optional) - Property to breakdown by (default: 'page')
+- `granularity` (optional) - Time series granularity: 'day' or 'hour' (default: 'day')
+
+**Response includes:**
+- Total count and unique users
+- Time series data (daily/hourly trends)
+- Properties breakdown (e.g., by page name)
+- Individual user journeys
+- Common user paths
 
 #### `GET /dashboard/analytics/funnel?steps=install,signup,purchase&from=2026-01-01&to=2026-01-07`
 User-specific funnel analysis.

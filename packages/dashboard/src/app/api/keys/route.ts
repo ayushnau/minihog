@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE - Delete API key
+// DELETE - Revoke API key or all keys
 export async function DELETE(request: NextRequest) {
   const userId = await getUserId(request);
   if (!userId) {
@@ -91,7 +91,18 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const keyId = searchParams.get('id');
+    const revokeAll = searchParams.get('all') === 'true';
     
+    // Revoke all keys
+    if (revokeAll) {
+      const count = await auth.deleteAllApiKeys(userId);
+      return NextResponse.json({ 
+        success: true, 
+        message: `Revoked ${count} API key(s)` 
+      });
+    }
+    
+    // Revoke single key
     if (!keyId) {
       return NextResponse.json(
         { error: 'API key ID is required' },
@@ -99,20 +110,20 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const deleted = await auth.deleteApiKey(userId, keyId);
+    const revoked = await auth.deleteApiKey(userId, keyId);
     
-    if (!deleted) {
+    if (!revoked) {
       return NextResponse.json(
         { error: 'API key not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: 'API key revoked successfully' });
   } catch (error: any) {
-    console.error('Delete API key error:', error);
+    console.error('Revoke API key error:', error);
     return NextResponse.json(
-      { error: 'Failed to delete API key' },
+      { error: 'Failed to revoke API key' },
       { status: 500 }
     );
   }

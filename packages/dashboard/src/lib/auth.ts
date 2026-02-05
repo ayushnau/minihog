@@ -135,16 +135,54 @@ export const auth = {
 
     // Generate unique API key with retry logic
     let attempts = 0;
-    const maxAttempts = 10;
+    const maxAttempts = 20; // Increased retry attempts
     let apiKey;
 
     while (attempts < maxAttempts) {
-      // Generate secure random API key with timestamp and random data
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      const uniqueString = `${userId}_${timestamp}_${random}`;
-      const encoded = Buffer.from(uniqueString).toString('base64url');
-      const key = `mh_${encoded.replace(/[^a-zA-Z0-9]/g, '').substring(0, 40)}`;
+      // Use cryptographically secure random bytes for better uniqueness
+      let key: string;
+      
+      try {
+        // Try to use crypto.randomBytes (Node.js) for cryptographically secure randomness
+        const crypto = require('crypto');
+        // Generate 32 random bytes (256 bits of entropy)
+        const randomBytes = crypto.randomBytes(32);
+        // Convert to base64url encoding (URL-safe, no padding)
+        const base64url = randomBytes
+          .toString('base64')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=/g, '');
+        
+        // Create key with prefix and ensure it's long enough (64 chars from base64)
+        key = `mh_${base64url}`;
+      } catch (e) {
+        // Fallback for environments without crypto (shouldn't happen in Node.js)
+        // Use timestamp + UUID-like string + multiple random sources
+        const timestamp = Date.now();
+        const random1 = Math.random().toString(36).substring(2, 15);
+        const random2 = Math.random().toString(36).substring(2, 15);
+        const random3 = Math.random().toString(36).substring(2, 15);
+        const random4 = Math.random().toString(36).substring(2, 15);
+        const random5 = Math.random().toString(36).substring(2, 15);
+        const random6 = Math.random().toString(36).substring(2, 15);
+        
+        // Add high-resolution time for more uniqueness
+        let highResTime: number;
+        if (typeof process !== 'undefined' && process.hrtime) {
+          const hrtime = process.hrtime.bigint();
+          highResTime = Number(hrtime % BigInt(1000000000));
+        } else {
+          highResTime = Math.random() * 1000000000;
+        }
+        
+        // Create a very long unique string
+        const uniqueString = `${userId}_${timestamp}_${highResTime}_${random1}_${random2}_${random3}_${random4}_${random5}_${random6}_${attempts}_${Math.random()}`;
+        
+        // Encode and create key
+        const encoded = Buffer.from(uniqueString).toString('base64url');
+        key = `mh_${encoded.replace(/[^a-zA-Z0-9]/g, '').substring(0, 64)}`;
+      }
 
       try {
         // Try to create the API key
@@ -157,23 +195,40 @@ export const auth = {
         });
         break; // Success, exit loop
       } catch (error: any) {
-        // If it's a unique constraint error, try again
-        if (error.code === 'P2002' && error.meta?.target?.includes('key')) {
+        // Check for unique constraint error (Prisma error code P2002)
+        const isUniqueConstraintError = 
+          error.code === 'P2002' || 
+          error.message?.toLowerCase().includes('unique') ||
+          error.message?.toLowerCase().includes('duplicate') ||
+          (error.meta?.target && error.meta.target.includes('key'));
+        
+        if (isUniqueConstraintError) {
           attempts++;
+          console.warn(`API key collision detected (attempt ${attempts}/${maxAttempts}), retrying...`);
+          
           if (attempts >= maxAttempts) {
+            console.error(`Failed to generate unique API key after ${maxAttempts} attempts`);
             throw new Error('Failed to generate unique API key. Please try again.');
           }
-          // Wait a tiny bit before retrying
-          await new Promise(resolve => setTimeout(resolve, 10));
+          
+          // Wait before retrying with exponential backoff
+          const delay = 50 + (attempts * 20);
+          await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
-        // If it's a different error, throw it
+        
+        // If it's a different error, log it and throw
+        console.error('Unexpected error generating API key:', {
+          code: error.code,
+          message: error.message,
+          meta: error.meta,
+        });
         throw error;
       }
     }
 
     if (!apiKey) {
-      throw new Error('Failed to generate API key');
+      throw new Error('Failed to generate API key after maximum attempts');
     }
 
     return {
@@ -185,10 +240,13 @@ export const auth = {
     };
   },
 
-  // Get API keys for user
+  // Get API keys for user (only active keys, excluding soft-deleted ones)
   getUserApiKeys: async (userId: string): Promise<ApiKey[]> => {
     const keys = await (prisma as any).apiKey.findMany({
-      where: { userId },
+      where: { 
+        userId,
+        deletedAt: null, // Only return active (non-revoked) keys - migration applied
+      },
       select: {
         id: true,
         key: true,
@@ -210,15 +268,18 @@ export const auth = {
     }));
   },
 
-  // Validate API key and update last used
+  // Validate API key and update last used (only active keys)
   validateApiKey: async (key: string): Promise<{ userId: string } | null> => {
-    const apiKey = await (prisma as any).apiKey.findUnique({
-      where: { key },
+    const apiKey = await (prisma as any).apiKey.findFirst({
+      where: { 
+        key,
+        deletedAt: null, // Only allow active (non-revoked) keys - migration applied
+      },
       include: {
         user: true,
       },
     });
-
+    
     if (!apiKey) {
       return null;
     }
@@ -234,7 +295,7 @@ export const auth = {
     return { userId: apiKey.userId };
   },
 
-  // Delete API key
+  // Revoke API key (soft delete - sets deletedAt timestamp)
   deleteApiKey: async (userId: string, keyId: string): Promise<boolean> => {
     const apiKey = await (prisma as any).apiKey.findFirst({
       where: {
@@ -247,10 +308,32 @@ export const auth = {
       return false;
     }
 
-    await (prisma as any).apiKey.delete({
+    // Soft delete: set deletedAt instead of actually deleting
+    // Migration applied - deletedAt column exists now
+    await (prisma as any).apiKey.update({
       where: { id: keyId },
+      data: {
+        deletedAt: new Date(),
+      },
     });
 
     return true;
+  },
+
+  // Revoke all API keys for a user (soft delete)
+  deleteAllApiKeys: async (userId: string): Promise<number> => {
+    // Soft delete: set deletedAt for all active keys
+    // Migration applied - deletedAt column exists now
+    const result = await (prisma as any).apiKey.updateMany({
+      where: { 
+        userId,
+        deletedAt: null, // Only update keys that aren't already deleted
+      },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+
+    return result.count;
   },
 };

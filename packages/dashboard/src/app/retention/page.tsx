@@ -5,6 +5,7 @@ import { api, RetentionResponse } from '@/lib/api';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { AuthGuard } from '@/components/AuthGuard';
 import { format, subDays } from 'date-fns';
+import { useDebounce } from '@/lib/useDebounce';
 
 export default function RetentionPage() {
   const [from, setFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
@@ -15,11 +16,67 @@ export default function RetentionPage() {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<RetentionResponse | null>(null);
 
+  // Debounce cohort to prevent API calls on every keystroke
+  const debouncedCohort = useDebounce(cohort, 500);
+
+  const handleDateChange = (newFrom: string, newTo: string) => {
+    setFrom(newFrom);
+    setTo(newTo);
+  };
+
+  useEffect(() => {
+    // Only load if cohort is not empty
+    if (!debouncedCohort.trim()) {
+      setData(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    // Validate day
+    if (!day || day < 1) {
+      setError('Day must be at least 1');
+      setLoading(false);
+      return;
+    }
+
+    // Load data with debounced value
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await api.getRetentionAnalysis(debouncedCohort.trim(), day, from, to);
+        setData(result);
+      } catch (err) {
+        setError('Failed to load retention data');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [from, to, debouncedCohort, day]);
+
   const loadData = async () => {
+    // Validate cohort before making API call
+    if (!cohort || !cohort.trim()) {
+      setError('Please enter a cohort event name');
+      setLoading(false);
+      return;
+    }
+
+    // Validate day
+    if (!day || day < 1) {
+      setError('Day must be at least 1');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const result = await api.getRetentionAnalysis(cohort, day, from, to);
+      const result = await api.getRetentionAnalysis(cohort.trim(), day, from, to);
       setData(result);
     } catch (err) {
       setError('Failed to load retention data');
@@ -28,15 +85,6 @@ export default function RetentionPage() {
       setLoading(false);
     }
   };
-
-  const handleDateChange = (newFrom: string, newTo: string) => {
-    setFrom(newFrom);
-    setTo(newTo);
-  };
-
-  useEffect(() => {
-    loadData();
-  }, [from, to, cohort, day]);
 
   return (
     <AuthGuard>
@@ -53,6 +101,12 @@ export default function RetentionPage() {
               type="text"
               value={cohort}
               onChange={(e) => setCohort(e.target.value)}
+              onKeyDown={(e) => {
+                // Only trigger on Enter if cohort is not empty
+                if (e.key === 'Enter' && cohort.trim()) {
+                  loadData();
+                }
+              }}
               placeholder="e.g., install"
               className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
@@ -69,7 +123,8 @@ export default function RetentionPage() {
           </div>
           <button
             onClick={loadData}
-            className="px-4 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-700"
+            disabled={!cohort.trim()}
+            className="px-4 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             Analyze
           </button>

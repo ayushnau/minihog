@@ -135,6 +135,7 @@ class MiniHog {
 
   /**
    * Internal method to send events to the API
+   * Sends all events in a single batch request for better performance
    */
   private async flushEvents(events: Array<{
     event: string;
@@ -142,9 +143,20 @@ class MiniHog {
     timestamp: number;
     properties: EventProperties;
   }>): Promise<void> {
-    // Send events one by one (in production, you might batch them)
-    for (const event of events) {
-      await this.transport.send('/track', event);
+    if (events.length === 0) {
+      return;
+    }
+
+    // Send all events in a single batch request
+    // This reduces HTTP overhead and improves performance
+    if (events.length === 1) {
+      // Single event - use regular endpoint for backward compatibility
+      await this.transport.send('/track', events[0]);
+    } else {
+      // Multiple events - use batch endpoint
+      await this.transport.send('/track/batch', {
+        events: events,
+      });
     }
   }
 
@@ -170,6 +182,15 @@ class MiniHog {
       clearInterval(this.flushTimer);
       this.flushTimer = undefined;
     }
+    this.session.reset();
+  }
+
+  /**
+   * Get the current distinct ID (useful for debugging)
+   * This will check localStorage and update if it was cleared
+   */
+  getDistinctId(): string {
+    return this.session.getDistinctId();
   }
 }
 

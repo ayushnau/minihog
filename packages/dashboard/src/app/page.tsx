@@ -99,11 +99,22 @@ import MiniHog from 'minihog-sdk';
 
 MiniHog.init({
   environment: 'production', // 'production' | 'sandbox' | 'development'
-  apiKey: 'your-api-key'
+  apiKey: 'your-api-key' // Get from dashboard
 });
 
-MiniHog.track('app_open');
-MiniHog.track('purchase', { amount: 299 });`}
+// Track page views (for user behavior analysis)
+MiniHog.track('page_view', { page: '/home' });
+MiniHog.track('page_view', { page: '/pricing' });
+
+// Track button clicks with page context
+MiniHog.track('button_click', { 
+  page: '/home',
+  button_name: 'signup' 
+});
+
+// Track conversions
+MiniHog.track('signup', { page: '/signup', plan: 'premium' });
+MiniHog.track('purchase', { page: '/checkout', amount: 299 });`}
                   </pre>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                     The SDK automatically uses the correct API endpoint based on the environment. 

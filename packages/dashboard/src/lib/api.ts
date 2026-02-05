@@ -47,6 +47,37 @@ apiClient.interceptors.response.use(
 );
 
 // Types
+export interface TimeSeriesDataPoint {
+  date: string;
+  count: number;
+  unique_users: number;
+}
+
+export interface PropertyBreakdown {
+  value: string;
+  count: number;
+  unique_users: number;
+}
+
+export interface UserJourneyEvent {
+  event_name: string;
+  timestamp: string;
+  properties: Record<string, any>;
+}
+
+export interface UserJourney {
+  user_id: string;
+  events: UserJourneyEvent[];
+  total_events: number;
+}
+
+export interface CommonPath {
+  path: string[];
+  path_with_ids?: Array<{ event_name: string; button_id?: string }>;
+  count: number;
+  percentage: number;
+}
+
 export interface EventCountResponse {
   success: boolean;
   event: string;
@@ -54,6 +85,11 @@ export interface EventCountResponse {
   to: string;
   total_count: number;
   unique_users: number;
+  time_series?: TimeSeriesDataPoint[];
+  properties_breakdown?: PropertyBreakdown[];
+  available_properties?: string[];
+  user_journeys?: UserJourney[];
+  common_paths?: CommonPath[];
 }
 
 export interface FunnelStep {
@@ -97,15 +133,27 @@ export interface AttributionResponse {
 
 // API functions
 export const api = {
-  // Get event counts (uses Next.js API route proxy - cookies work on same domain)
+  // Get event counts with optional time series, properties breakdown, and user journeys
   getEventCounts: async (
     event: string,
     from: string,
-    to: string
+    to: string,
+    options?: {
+      includeTimeSeries?: boolean;
+      includeProperties?: boolean;
+      includeJourneys?: boolean;
+      propertyKey?: string;
+      granularity?: 'day' | 'hour';
+    }
   ): Promise<EventCountResponse> => {
-    const response = await apiClient.get('/api/analytics/events', {
-      params: { event, from, to },
-    });
+    const params: any = { event, from, to };
+    if (options?.includeTimeSeries) params.include_time_series = 'true';
+    if (options?.includeProperties) params.include_properties = 'true';
+    if (options?.includeJourneys) params.include_journeys = 'true';
+    if (options?.propertyKey) params.property_key = options.propertyKey;
+    if (options?.granularity) params.granularity = options.granularity;
+
+    const response = await apiClient.get('/api/analytics/events', { params });
     return response.data;
   },
 

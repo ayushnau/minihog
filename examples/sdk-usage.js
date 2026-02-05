@@ -36,9 +36,29 @@ console.log(`
     product_id: 'prod_123'
   });
   
-  // Multiple events (will be batched)
+  // Track page views with page name (for user behavior analysis)
   MiniHog.track('page_view', { page: '/home' });
-  MiniHog.track('button_click', { button: 'signup' });
+  MiniHog.track('page_view', { page: '/pricing' });
+  
+  // Track button clicks with page and button name
+  MiniHog.track('button_click', { 
+    page: '/home',
+    button_name: 'signup' 
+  });
+  
+  // Track user actions with properties
+  MiniHog.track('signup', { 
+    page: '/signup',
+    plan: 'premium' 
+  });
+  
+  // Track purchases with details
+  MiniHog.track('purchase', { 
+    page: '/checkout',
+    amount: 299,
+    currency: 'USD',
+    product_id: 'prod_123'
+  });
 `);
 
 // Manual flush

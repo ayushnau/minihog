@@ -16,6 +16,13 @@ export default function FunnelPage() {
   const [data, setData] = useState<FunnelResponse | null>(null);
 
   const loadData = async () => {
+    // Validate steps before making API call
+    if (!steps || !steps.trim()) {
+      setError('Please enter at least 2 funnel steps');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -63,12 +70,19 @@ export default function FunnelPage() {
           type="text"
           value={steps}
           onChange={(e) => setSteps(e.target.value)}
+          onKeyDown={(e) => {
+            // Only trigger on Enter if steps are not empty
+            if (e.key === 'Enter' && steps.trim()) {
+              loadData();
+            }
+          }}
           placeholder="e.g., install,signup,purchase"
           className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-sm flex-1 min-w-[300px] bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
         />
         <button
           onClick={loadData}
-          className="ml-4 px-4 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-700"
+          disabled={!steps.trim()}
+          className="ml-4 px-4 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           Analyze
         </button>

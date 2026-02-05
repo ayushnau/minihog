@@ -75,6 +75,50 @@ export default function ApiKeysPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const revokeKey = async (keyId: string) => {
+    if (!confirm('Are you sure you want to revoke this API key? This will permanently remove the key and any applications using it will stop working. This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/keys?id=${keyId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        loadKeys();
+        setError('');
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to revoke API key');
+      }
+    } catch (err: any) {
+      setError('Failed to revoke API key');
+    }
+  };
+
+  const revokeAllKeys = async () => {
+    if (!confirm('Are you sure you want to revoke ALL API keys? This will permanently remove all keys and any applications using them will stop working. This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/keys?all=true', {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        loadKeys();
+        setError('');
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to revoke API keys');
+      }
+    } catch (err: any) {
+      setError('Failed to revoke API keys');
+    }
+  };
+
   return (
     <AuthGuard>
       <div className="container mx-auto px-4 py-8">
@@ -148,8 +192,19 @@ export default function ApiKeysPage() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Your API Keys</h2>
+            {keys.length > 0 && (
+              <button
+                onClick={revokeAllKeys}
+                className="px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center space-x-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+                <span>Revoke All</span>
+              </button>
+            )}
           </div>
           {loading ? (
             <div className="p-8 text-center text-gray-500 dark:text-gray-400">Loading...</div>
@@ -160,18 +215,33 @@ export default function ApiKeysPage() {
           ) : (
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {keys.map((key) => (
-                <div key={key.id} className="p-6 flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">{key.name}</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Created {new Date(key.createdAt).toLocaleDateString()}
-                    </p>
-                    {key.key && (
-                      <code className="mt-2 block text-sm font-mono bg-gray-100 dark:bg-gray-900 px-3 py-2 rounded text-gray-900 dark:text-white">
+                <div key={key.id} className="p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{key.name}</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                        Created {new Date(key.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => revokeKey(key.id)}
+                      className="flex items-center space-x-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors whitespace-nowrap flex-shrink-0"
+                      title="Revoke API key"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                      </svg>
+                      <span>Revoke Key</span>
+                    </button>
+                  </div>
+                  {key.key && (
+                    <div className="flex items-center gap-4 mt-2">
+                      <code className="flex-1 block text-sm font-mono bg-gray-100 dark:bg-gray-900 px-3 py-2 rounded text-gray-900 dark:text-white break-all">
                         {key.key}
                       </code>
-                    )}
-                  </div>
+                      <div className="w-[120px] flex-shrink-0"></div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

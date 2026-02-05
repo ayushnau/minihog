@@ -13,8 +13,25 @@ export class Session {
   /**
    * Get or create a distinct ID for this user/device
    * Tries to persist across sessions using localStorage (browser) or memory (Node.js)
+   * Checks localStorage on each call to handle cases where it was cleared
    */
   getDistinctId(): string {
+    // Re-check localStorage in case it was cleared after SDK initialization
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const stored = localStorage.getItem(this.STORAGE_KEY);
+      if (stored && stored !== this.distinctId) {
+        // localStorage has a different ID (was cleared and recreated)
+        this.distinctId = stored;
+      } else if (!stored && this.distinctId) {
+        // localStorage was cleared, generate new ID
+        this.distinctId = this.generateDistinctId();
+        try {
+          localStorage.setItem(this.STORAGE_KEY, this.distinctId);
+        } catch (e) {
+          // localStorage might be disabled
+        }
+      }
+    }
     return this.distinctId;
   }
 

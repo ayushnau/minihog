@@ -144,9 +144,23 @@ All analytics pages:
 - Show loading states during data fetch
 
 ### Events Page (`/events`)
-- Event count over time
-- Unique users per event
-- Line charts for visualization
+Comprehensive user behavior analytics with:
+
+- **Overview Cards**: Total events, unique users, and trend comparison
+- **Time Series Chart**: Daily/hourly line chart showing event trends over time
+- **Properties Breakdown**: 
+  - Bar chart and pie chart showing event distribution by property (e.g., page name)
+  - Top values list with counts and unique users
+  - Property selector dropdown (auto-detects available properties like 'page', 'button_name', etc.)
+- **Individual User Journeys**: Shows the sequence of events for each user (up to 20 users)
+- **Common User Paths**: Aggregated view of most common navigation patterns (e.g., "page_view → button_click → signup")
+
+**Default Event**: `button_click` (can be changed)
+
+**Best Practices:**
+- Include a `page` property in your events to see page-level breakdowns
+- Track `button_click` events with `button_name` and `page` properties
+- Use consistent event names and property keys for better analytics
 
 ### Funnel Page (`/funnel`)
 - Step-by-step user progression

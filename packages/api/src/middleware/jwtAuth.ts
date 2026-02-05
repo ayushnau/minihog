@@ -63,8 +63,10 @@ export async function validateJWT(
         });
       }
 
-      // Get user's API keys
-      const apiKeys = await prisma.apiKey.findMany({
+      // Get user's API keys (both active and revoked for historical data access)
+      // With soft-delete, revoked keys still exist (deletedAt is set)
+      // This allows us to access historical events even after key revocation
+      const allApiKeys = await prisma.apiKey.findMany({
         where: { userId },
         select: { id: true },
       });
@@ -72,7 +74,9 @@ export async function validateJWT(
       // Attach user info to request
       (req as any).userId = userId;
       (req as any).user = user;
-      (req as any).apiKeyIds = apiKeys.map(k => k.id);
+      // Include all API key IDs (active + revoked) so historical events are visible
+      // Analytics queries will use userId as primary filter, so this is mainly for backward compatibility
+      (req as any).apiKeyIds = allApiKeys.map(k => k.id);
 
       next();
     } catch (error: any) {
