@@ -173,7 +173,7 @@ MiniHog.track('purchase', { amount: 299, currency: 'INR' });
 MiniHog.flush();
 ```
 
-📦 **Published on npm**: [minihog-sdk](https://www.npmjs.com/package/minihog-sdk)
+📦 **Published on npm**: [minihog-sdk](https://www.npmjs.com/package/minihog-sdk) | [Package Access](https://www.npmjs.com/package/minihog-sdk/access)
 
 See [packages/sdk/README.md](./packages/sdk/README.md) for full documentation.
 

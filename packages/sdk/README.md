@@ -155,6 +155,7 @@ See [docs/NPM_PUBLISH.md](./docs/NPM_PUBLISH.md) for publishing instructions.
 ## Links
 
 - 📦 [npm Package](https://www.npmjs.com/package/minihog-sdk)
+- 🔐 [npm Package Access](https://www.npmjs.com/package/minihog-sdk/access)
 - 🌐 [Dashboard](https://minihog.ayushnautiyal.com)
 - 📚 [Main Documentation](../../../README.md)
 - 🏗️ [Architecture](./docs/ARCHITECTURE.md)
