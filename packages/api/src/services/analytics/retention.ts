@@ -7,6 +7,7 @@ import { prisma } from '../../db/client';
  * @param day - Number of days to check retention for (e.g., 7 for day-7 retention)
  * @param from - Start date for cohort
  * @param to - End date for cohort
+ * @param apiKeyIds - Optional array of API key IDs to filter by (for user-specific data)
  * 
  * Returns the percentage of users who performed any event N days after their cohort event
  */
@@ -14,20 +15,32 @@ export async function getRetentionAnalysis(
   cohortEvent: string,
   day: number,
   from: Date,
-  to: Date
+  to: Date,
+  apiKeyIds?: string[]
 ): Promise<{
   cohort_size: number;
   retained_users: number;
   retention_percentage: number;
 }> {
+  // Build where clause with optional API key filter
+  const baseWhereClause: any = {
+    timestamp: {
+      gte: from,
+      lte: to,
+    },
+  };
+
+  if (apiKeyIds && apiKeyIds.length > 0) {
+    baseWhereClause.apiKeyId = {
+      in: apiKeyIds,
+    };
+  }
+
   // Get all users who performed the cohort event in the date range
   const cohortEvents = await prisma.event.findMany({
     where: {
       eventName: cohortEvent,
-      timestamp: {
-        gte: from,
-        lte: to,
-      },
+      ...baseWhereClause,
     },
     select: {
       distinctId: true,
@@ -66,14 +79,22 @@ export async function getRetentionAnalysis(
       retentionWindowEnd.setDate(retentionWindowEnd.getDate() + 1); // Check within 1 day window
 
       // Check if user has any event in the retention window
-      const hasRetentionEvent = await prisma.event.findFirst({
-        where: {
-          distinctId,
-          timestamp: {
-            gte: retentionWindowStart,
-            lt: retentionWindowEnd,
-          },
+      const retentionWhereClause: any = {
+        distinctId,
+        timestamp: {
+          gte: retentionWindowStart,
+          lt: retentionWindowEnd,
         },
+      };
+
+      if (apiKeyIds && apiKeyIds.length > 0) {
+        retentionWhereClause.apiKeyId = {
+          in: apiKeyIds,
+        };
+      }
+
+      const hasRetentionEvent = await prisma.event.findFirst({
+        where: retentionWhereClause,
       });
 
       if (hasRetentionEvent) {

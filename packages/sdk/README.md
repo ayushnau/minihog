@@ -20,8 +20,8 @@ import MiniHog from 'minihog-sdk';
 
 // Initialize the SDK
 MiniHog.init({
-  endpoint: 'https://backendapiserver.vercel.app', // Your MiniHog API endpoint
-  apiKey: 'your-api-key', // Optional
+  environment: 'production', // 'production' | 'sandbox' | 'development'
+  apiKey: 'your-api-key', // Required for event tracking
   batchSize: 10, // Optional, default: 10
   flushInterval: 5000, // Optional, default: 5000ms
 });
@@ -35,11 +35,13 @@ MiniHog.track('signup', { plan: 'premium' });
 MiniHog.flush();
 ```
 
+> **Note:** To get an API key, sign up at the [MiniHog Dashboard](https://minihog.ayushnautiyal.com) and generate one in the Keys page.
+
 ## Configuration
 
 ```typescript
 interface MiniHogConfig {
-  endpoint: string;        // Required: Your MiniHog API endpoint
+  environment?: 'production' | 'sandbox' | 'development'; // Optional: Environment (default: 'production')
   apiKey?: string;         // Optional: API key for authentication
   batchSize?: number;      // Optional: Events to batch before sending (default: 10)
   flushInterval?: number;  // Optional: Auto-flush interval in ms (default: 5000)
@@ -47,6 +49,16 @@ interface MiniHogConfig {
   maxRetries?: number;     // Optional: Maximum retries (default: 3)
 }
 ```
+
+### Environments
+
+The SDK supports three environments:
+
+- **`production`** (default): Uses the production API endpoint
+- **`sandbox`**: Uses the sandbox API endpoint (for testing)
+- **`development`**: Uses `http://localhost:3000` (for local development)
+
+The endpoint is automatically determined based on the environment you specify. You don't need to provide the endpoint URL manually.
 
 ## Features
 
@@ -65,7 +77,8 @@ Initialize the SDK with configuration.
 
 ```javascript
 MiniHog.init({
-  endpoint: 'https://api.example.com',
+  environment: 'production', // or 'sandbox' or 'development'
+  apiKey: 'your-api-key',
   batchSize: 20,
   flushInterval: 10000,
 });
@@ -108,8 +121,41 @@ Works in all modern browsers that support:
 
 MIT
 
+## Getting API Keys
+
+1. Visit the [MiniHog Dashboard](https://minihog.ayushnautiyal.com)
+2. Sign up or sign in
+3. Navigate to the "Keys" page
+4. Click "Generate API Key"
+5. Copy the generated key and use it in your SDK initialization
+
+## Architecture
+
+For detailed information about the SDK's architecture, including environment-based endpoint resolution, see [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+
+## Development
+
+### Building from Source
+
+```bash
+# Install dependencies
+npm install
+
+# Build TypeScript
+npm run build
+
+# Run tests (if available)
+npm test
+```
+
+### Publishing
+
+See [docs/NPM_PUBLISH.md](./docs/NPM_PUBLISH.md) for publishing instructions.
+
 ## Links
 
 - 📦 [npm Package](https://www.npmjs.com/package/minihog-sdk)
-- 📚 [Documentation](https://github.com/yourusername/posthog)
-- 🐛 [Report Issues](https://github.com/yourusername/posthog/issues)
+- 🌐 [Dashboard](https://minihog.ayushnautiyal.com)
+- 📚 [Main Documentation](../../../README.md)
+- 🏗️ [Architecture](./docs/ARCHITECTURE.md)
+- 💻 [GitHub Repository](https://github.com/ayushnau/minihog)

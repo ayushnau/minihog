@@ -1,27 +1,24 @@
 # Publishing MiniHog SDK to npm
 
+📦 **Published Package**: [minihog-sdk](https://www.npmjs.com/package/minihog-sdk)
+
 ## Prerequisites
 
 1. **npm account**: Create one at [npmjs.com](https://www.npmjs.com/signup) if you don't have one
-2. **Login to npm**: `npm login` (from your terminal)
-3. **Check package name availability**: The name `minihog-sdk` might be taken. You may need to use a scoped package like `@yourusername/minihog-sdk`
+2. **2FA Enabled**: npm requires 2FA for publishing. See [NPM_2FA_SETUP.md](./NPM_2FA_SETUP.md)
+3. **Login to npm**: `npm login` (from your terminal)
+4. **Package name**: The package is published as `minihog-sdk`
 
-## Step 1: Check Package Name Availability
+> **Note:** Run all commands from the `packages/sdk` directory.
+
+## Step 1: Verify Current Package
 
 ```bash
 cd packages/sdk
 npm view minihog-sdk
 ```
 
-If it returns 404, the name is available. If it returns package info, the name is taken.
-
-**If name is taken**, update `package.json` to use a scoped package:
-```json
-{
-  "name": "@yourusername/minihog-sdk",
-  ...
-}
-```
+This shows the current published version and package info.
 
 ## Step 2: Update package.json
 
@@ -93,9 +90,21 @@ npm view @yourusername/minihog-sdk
 ## Important Notes
 
 - **Version**: Follow semantic versioning (semver)
-- **Files**: Only files listed in `files` array will be published
-- **README**: Include a good README.md for npm
-- **License**: Make sure LICENSE file exists if using MIT license
+- **Files**: Only files listed in `files` array in `package.json` will be published
+- **README**: README.md is automatically included and shown on npm
+- **License**: MIT license is specified in package.json
+- **2FA Required**: npm requires 2FA for publishing. See [NPM_2FA_SETUP.md](./NPM_2FA_SETUP.md) if you encounter 403 errors
+
+## Related Documentation
+
+- [SDK README](../README.md) - SDK usage and API reference
+- [NPM_2FA_SETUP.md](./NPM_2FA_SETUP.md) - 2FA setup guide
+
+## Current Package Info
+
+- **Name**: `minihog-sdk`
+- **Registry**: https://www.npmjs.com/package/minihog-sdk
+- **Install**: `npm install minihog-sdk`
 
 ## Troubleshooting
 
@@ -109,4 +118,5 @@ npm view @yourusername/minihog-sdk
 **"403 Forbidden"**
 - Make sure you're logged in: `npm whoami`
 - Check you have publish permissions
+- **2FA Required**: npm requires 2FA for publishing. See [NPM_2FA_SETUP.md](./NPM_2FA_SETUP.md)
 

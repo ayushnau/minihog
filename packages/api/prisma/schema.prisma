@@ -17,11 +17,15 @@ model Event {
   timestamp             DateTime
   properties            Json     @default("{}")
   attributedCampaignId  String?  @map("attributed_campaign_id")
+  apiKeyId              String?  @map("api_key_id")
   createdAt             DateTime @default(now()) @map("created_at")
+
+  apiKey                ApiKey?  @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
 
   @@index([eventName, timestamp])
   @@index([distinctId])
   @@index([timestamp])
+  @@index([apiKeyId])
   @@map("events")
 }
 
@@ -76,6 +80,7 @@ model ApiKey {
   createdAt DateTime @default(now()) @map("created_at")
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events    Event[]
 
   @@index([userId])
   @@index([key])

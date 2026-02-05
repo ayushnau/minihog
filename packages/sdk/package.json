@@ -1,6 +1,6 @@
 {
   "name": "minihog-sdk",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "JavaScript SDK for MiniHog analytics - track events, funnels, retention, and attribution",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -31,8 +31,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/posthog.git",
+    "url": "https://github.com/ayushnau/minihog.git",
     "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/ayushnau/minihog#readme",
+  "bugs": {
+    "url": "https://github.com/ayushnau/minihog/issues"
   },
   "dependencies": {},
   "devDependencies": {
@@ -43,5 +47,3 @@
     "node": ">=14.0.0"
   }
 }
-
-

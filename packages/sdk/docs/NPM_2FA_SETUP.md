@@ -1,6 +1,11 @@
 # Setting Up npm 2FA for Publishing
 
-npm requires two-factor authentication (2FA) or a granular access token to publish packages.
+npm requires two-factor authentication (2FA) or a granular access token to publish packages. This is a security requirement for all npm package publishing.
+
+**Error you might see:**
+```
+npm error 403 Forbidden - Two-factor authentication or granular access token with bypass 2fa enabled is required to publish packages.
+```
 
 ## Option 1: Enable 2FA on npm Account (Recommended)
 
@@ -83,9 +88,19 @@ npm publish --access public --//registry.npmjs.org/:_authToken=your-token-here
 ## Quick Fix: Enable 2FA (Easiest)
 
 1. Visit: https://www.npmjs.com/settings/your-username/two-factor-auth
-2. Enable 2FA with an authenticator app
+2. Enable 2FA with an authenticator app (Google Authenticator, Authy, etc.)
 3. Run `npm logout` then `npm login` again
-4. Run `npm publish` in `packages/sdk`
+4. When logging in, you'll be prompted for:
+   - Username
+   - Password
+   - One-time password (from your authenticator app)
+5. Run `npm publish` in `packages/sdk`
+
+## Related Documentation
+
+- [NPM_PUBLISH.md](./NPM_PUBLISH.md) - Publishing guide
+- [SDK README](../README.md) - SDK usage
+- [npm 2FA Documentation](https://docs.npmjs.com/configuring-two-factor-authentication)
 
 ---
 

@@ -9,11 +9,13 @@ import { prisma } from '../../db/client';
  * - Step 3: Users who completed event 1, 2, AND 3 (in order)
  * 
  * Returns drop-off percentages between steps
+ * @param apiKeyIds - Optional array of API key IDs to filter by (for user-specific data)
  */
 export async function getFunnelAnalysis(
   steps: string[],
   from: Date,
-  to: Date
+  to: Date,
+  apiKeyIds?: string[]
 ): Promise<{
   funnel: Array<{
     step: number;
@@ -30,14 +32,25 @@ export async function getFunnelAnalysis(
     };
   }
 
+  // Build where clause with optional API key filter
+  const baseWhereClause: any = {
+    timestamp: {
+      gte: from,
+      lte: to,
+    },
+  };
+
+  if (apiKeyIds && apiKeyIds.length > 0) {
+    baseWhereClause.apiKeyId = {
+      in: apiKeyIds,
+    };
+  }
+
   // Step 1: Get all users who completed the first event
   const firstStepUsers = await prisma.event.findMany({
     where: {
       eventName: steps[0],
-      timestamp: {
-        gte: from,
-        lte: to,
-      },
+      ...baseWhereClause,
     },
     select: {
       distinctId: true,
@@ -85,10 +98,7 @@ export async function getFunnelAnalysis(
         distinctId: {
           in: Array.from(previousStepUsers.keys()),
         },
-        timestamp: {
-          gte: from,
-          lte: to,
-        },
+        ...baseWhereClause,
       },
       select: {
         distinctId: true,

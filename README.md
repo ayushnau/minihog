@@ -1,8 +1,21 @@
 # MiniHog
 
-A PostHog-inspired analytics and attribution engine built with Node.js, MySQL, and TypeScript.
+A PostHog-inspired analytics and attribution engine built with Node.js, PostgreSQL, and TypeScript.
 
 MiniHog is a lightweight analytics backend focused on event ingestion, analytics primitives, and attribution. It demonstrates production-style systems engineering with a clean, well-organized codebase.
+
+## 📚 Documentation
+
+All documentation is organized in the [`docs/`](./docs/) folder:
+
+- **[Setup Guide](./docs/setup/SETUP.md)** - Local development setup
+- **[Deployment Guides](./docs/deployment/)** - Deploy to Vercel, Supabase, etc.
+- **[Troubleshooting](./docs/troubleshooting/)** - Common issues and solutions
+
+Quick links:
+- [Quick Deploy](./docs/deployment/QUICK_DEPLOY.md)
+- [Vercel + Supabase Setup](./docs/deployment/DEPLOY_VERCEL_SUPABASE.md)
+- [CORS Configuration](./docs/troubleshooting/CORS_SETUP.md)
 
 ## 🏗️ Architecture
 
@@ -28,8 +41,14 @@ This project uses [Turborepo](https://turbo.build/) for monorepo management:
 ```
 minihog/
 ├── packages/
-│   ├── api/          # Backend API (Express + Prisma + MySQL)
-│   └── sdk/          # JavaScript SDK
+│   ├── api/          # Backend API (Express + Prisma + PostgreSQL)
+│   ├── dashboard/    # Next.js Dashboard (React + Tailwind)
+│   └── sdk/          # JavaScript SDK (npm package)
+├── docs/             # Documentation
+│   ├── deployment/   # Deployment guides
+│   ├── setup/        # Setup guides
+│   └── troubleshooting/ # Troubleshooting guides
+├── scripts/          # Utility scripts
 ├── turbo.json        # Turborepo configuration
 └── package.json      # Root workspace configuration
 ```
@@ -39,60 +58,36 @@ minihog/
 ### Prerequisites
 
 - Node.js 18+ 
-- MySQL 5.7+ or MariaDB 10.2+ (JSON support required)
+- PostgreSQL 12+ (or use Supabase)
 - npm or yarn
 
-### Setup
+### Quick Setup
 
-1. **Clone and install dependencies:**
+See the [Setup Guide](./docs/setup/SETUP.md) for detailed instructions.
+
+**TL;DR:**
 
 ```bash
+# 1. Install dependencies
 npm install
-```
 
-2. **Set up the database:**
+# 2. Set up database (PostgreSQL/Supabase)
+# See docs/setup/SETUP.md or docs/deployment/SUPABASE_SETUP.md
 
-```bash
-# Create a MySQL database
-mysql -u root -p -e "CREATE DATABASE minihog;"
-```
-
-3. **Configure environment variables:**
-
-```bash
+# 3. Configure environment variables
 cd packages/api
-cp .env.example .env
-```
+# Create .env with DATABASE_URL
 
-Edit `packages/api/.env` with your database connection:
+# 4. Run migrations
+npx prisma migrate deploy
+npx prisma generate
 
-```env
-DATABASE_URL="mysql://user:password@localhost:3306/minihog"
-PORT=3000
-NODE_ENV=development
-ATTRIBUTION_WINDOW_HOURS=24
-```
-
-4. **Run database migrations:**
-
-```bash
-cd packages/api
-npm run db:generate
-npm run db:migrate
-```
-
-5. **Start the API server:**
-
-```bash
-# From root
-npm run dev
-
-# Or from packages/api
-cd packages/api
+# 5. Start development
 npm run dev
 ```
 
-The API will be available at `http://localhost:3000`
+The API will be available at `http://localhost:3000`  
+The Dashboard will be available at `http://localhost:3001`
 
 ## 📚 API Endpoints
 
@@ -154,8 +149,7 @@ Returns attribution analytics (installs and purchases per campaign).
 ### Installation
 
 ```bash
-cd packages/sdk
-npm run build
+npm install minihog-sdk
 ```
 
 ### Usage
@@ -163,9 +157,10 @@ npm run build
 ```javascript
 import MiniHog from 'minihog-sdk';
 
-// Initialize
+// Initialize with environment (no need to specify endpoint)
 MiniHog.init({
-  endpoint: 'http://localhost:3000',
+  environment: 'production', // or 'sandbox' or 'development'
+  apiKey: 'your-api-key', // Required
   batchSize: 10,
   flushInterval: 5000,
 });
@@ -177,6 +172,10 @@ MiniHog.track('purchase', { amount: 299, currency: 'INR' });
 // Manually flush (events are auto-flushed on interval or page unload)
 MiniHog.flush();
 ```
+
+📦 **Published on npm**: [minihog-sdk](https://www.npmjs.com/package/minihog-sdk)
+
+See [packages/sdk/README.md](./packages/sdk/README.md) for full documentation.
 
 ### SDK Features
 
@@ -199,14 +198,15 @@ The attribution window is configurable via `ATTRIBUTION_WINDOW_HOURS` environmen
 ## 🗄️ Database Schema
 
 ### Events Table
-- `id` (String/CUID, PK)
+- `id` (String/UUID, PK)
 - `event_name` (String)
 - `distinct_id` (String)
 - `timestamp` (DateTime)
 - `properties` (JSON)
 - `attributed_campaign_id` (String, nullable)
+- `api_key_id` (String, nullable) - Links event to API key
 
-**Indexes:** `(event_name, timestamp)`, `distinct_id`, `timestamp`
+**Indexes:** `(event_name, timestamp)`, `distinct_id`, `timestamp`, `api_key_id`
 
 ### Clicks Table
 - `id` (String/CUID, PK)
@@ -278,12 +278,13 @@ npm run db:studio
 - **Developer experience**: Great migrations, Prisma Studio for debugging
 - **Performance**: Efficient queries with proper indexing
 
-### Why MySQL?
+### Why PostgreSQL?
 
-- **JSON support**: Flexible event properties storage (MySQL 5.7+)
+- **JSON support**: Native JSONB for flexible event properties
 - **Reliability**: ACID compliance for analytics correctness
 - **Indexing**: Efficient queries on time-series data
-- **Wide adoption**: Popular, well-supported database
+- **Supabase integration**: Easy deployment and scaling
+- **Type safety**: Better type support than MySQL
 
 ### Why Express?
 

@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db/client';
+import { validateApiKey } from '../middleware/apiKeyAuth';
 
 const router = Router();
 
@@ -16,11 +17,13 @@ const trackEventSchema = z.object({
 /**
  * POST /track
  * Ingests a user event
+ * Requires API key authentication
  */
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', validateApiKey, async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Validate request body
     const body = trackEventSchema.parse(req.body);
+    const apiKeyId = (req as any).apiKeyId;
 
     // Use provided timestamp or current time
     const timestamp = body.timestamp ? new Date(body.timestamp) : new Date();
@@ -40,7 +43,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       }
     }
 
-    // Create event
+    // Create event with API key association
     const event = await prisma.event.create({
       data: {
         id: body.event_id || undefined, // Use provided ID or let Prisma generate
@@ -48,7 +51,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         distinctId: body.distinct_id,
         timestamp,
         properties: body.properties || {},
-      },
+        apiKeyId: apiKeyId || null, // Associate event with API key
+      } as any, // Type assertion - Prisma types should include apiKeyId after regeneration
     });
 
     res.status(201).json({

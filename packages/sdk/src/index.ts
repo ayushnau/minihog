@@ -3,11 +3,25 @@ import { Transport } from './transport';
 import { Session } from './session';
 
 /**
+ * Environment types for MiniHog SDK
+ */
+export type MiniHogEnvironment = 'production' | 'sandbox' | 'development';
+
+/**
+ * Endpoint mapping for different environments
+ */
+const ENDPOINT_MAP: Record<MiniHogEnvironment, string> = {
+  production: 'https://backendapiserver.vercel.app',
+  sandbox: 'https://backendapiserver.vercel.app', // Same as production for now
+  development: 'http://localhost:3000', // Local development
+};
+
+/**
  * MiniHog SDK Configuration
  */
 export interface MiniHogConfig {
   apiKey?: string; // Optional for now, can be used for authentication later
-  endpoint: string; // API endpoint URL
+  environment?: MiniHogEnvironment; // Environment: 'production' | 'sandbox' | 'development' (default: 'production')
   batchSize?: number; // Number of events to batch before sending (default: 10)
   flushInterval?: number; // Milliseconds between automatic flushes (default: 5000)
   enableRetry?: boolean; // Enable retry logic (default: true)
@@ -25,7 +39,7 @@ export interface EventProperties {
  * Main MiniHog SDK class
  */
 class MiniHog {
-  private config: Required<MiniHogConfig>;
+  private config: Required<MiniHogConfig> & { endpoint: string };
   private queue: Queue;
   private transport: Transport;
   private session: Session;
@@ -33,9 +47,11 @@ class MiniHog {
 
   constructor() {
     // Default config (will be overridden by init)
+    const defaultEnvironment: MiniHogEnvironment = 'production';
     this.config = {
       apiKey: '',
-      endpoint: '',
+      environment: defaultEnvironment,
+      endpoint: ENDPOINT_MAP[defaultEnvironment],
       batchSize: 10,
       flushInterval: 5000,
       enableRetry: true,
@@ -43,7 +59,7 @@ class MiniHog {
     };
 
     this.session = new Session();
-    this.transport = new Transport(this.config.endpoint, this.config.enableRetry, this.config.maxRetries);
+    this.transport = new Transport(this.config.endpoint, this.config.enableRetry, this.config.maxRetries, this.config.apiKey);
     this.queue = new Queue(this.config.batchSize, (events) => this.flushEvents(events));
 
     // Setup page unload handler for browser environments
@@ -58,16 +74,22 @@ class MiniHog {
    * Initialize the SDK with configuration
    */
   init(config: MiniHogConfig): void {
+    const environment = config.environment || 'production';
+    const endpoint = ENDPOINT_MAP[environment];
+
     this.config = {
       ...this.config,
       ...config,
+      environment,
+      endpoint,
     };
 
     // Reinitialize transport with new config
     this.transport = new Transport(
       this.config.endpoint,
       this.config.enableRetry,
-      this.config.maxRetries
+      this.config.maxRetries,
+      this.config.apiKey
     );
 
     // Reinitialize queue with new batch size
@@ -81,7 +103,7 @@ class MiniHog {
    * Track an event
    */
   track(eventName: string, properties?: EventProperties): void {
-    if (!this.config.endpoint) {
+    if (!this.config.endpoint || !this.config.environment) {
       console.warn('MiniHog: SDK not initialized. Call init() first.');
       return;
     }
