@@ -242,26 +242,33 @@ export const auth = {
 
   // Get API keys for user (only active keys, excluding soft-deleted ones)
   getUserApiKeys: async (userId: string): Promise<ApiKey[]> => {
-    const keys = await (prisma as any).apiKey.findMany({
-      where: { 
-        userId,
-        deletedAt: null, // Only return active (non-revoked) keys - migration applied
-      },
-      select: {
-        id: true,
-        key: true,
-        name: true,
-        createdAt: true,
-        lastUsed: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    let keys: any[];
 
-    return keys.map((k: any) => ({
+    try {
+      keys = await (prisma as any).apiKey.findMany({
+        where: { userId, deletedAt: null },
+        select: { id: true, key: true, name: true, createdAt: true, lastUsed: true },
+        orderBy: { createdAt: 'desc' as const },
+      });
+    } catch (e: any) {
+      const isMissingColumn =
+        e?.message?.includes('deleted_at') || e?.message?.includes('deletedAt');
+      if (isMissingColumn) {
+        // DB not migrated yet: fetch all (all considered active)
+        keys = await (prisma as any).apiKey.findMany({
+          where: { userId },
+          select: { id: true, key: true, name: true, createdAt: true, lastUsed: true },
+          orderBy: { createdAt: 'desc' as const },
+        });
+      } else {
+        throw e;
+      }
+    }
+
+    const activeKeys = keys;
+    return activeKeys.map((k: any) => ({
       id: k.id,
-      key: k.key.substring(0, 8) + '...' + k.key.substring(k.key.length - 4), // Mask key for display
+      key: k.key.substring(0, 8) + '...' + k.key.substring(k.key.length - 4),
       name: k.name,
       createdAt: k.createdAt,
       lastUsed: k.lastUsed,

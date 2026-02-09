@@ -26,16 +26,24 @@ export default function ApiKeysPage() {
 
   const loadKeys = async () => {
     setLoading(true);
+    setError('');
     try {
       const response = await fetch('/api/keys');
+      const data = await response.json().catch(() => ({}));
       if (response.ok) {
-        const data = await response.json();
         setKeys(data.keys || []);
       } else {
-        setError('Failed to load API keys');
+        // Show specific message so you can fix config locally (e.g. 401 = sign in, 500 = DB/detail)
+        if (response.status === 401) {
+          setError('Please sign in again.');
+        } else {
+          const msg = data.error || 'Failed to load API keys';
+          const detail = data.detail; // In dev, API returns the real error
+          setError(detail ? `${msg}: ${detail}` : msg);
+        }
       }
     } catch (err) {
-      setError('Failed to load API keys');
+      setError('Failed to load API keys. Check the browser console and server logs.');
     } finally {
       setLoading(false);
     }

@@ -23,19 +23,21 @@ model User {
   @@map("users")
 }
 
-// API Keys table - stores API keys for users
+// API Keys table - stores API keys for users (soft delete via deletedAt)
 model ApiKey {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  key       String   @unique
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  key       String    @unique
   name      String
   lastUsed  DateTime? @map("last_used")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at") // Soft delete: set when key is revoked
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([key])
+  @@index([deletedAt])
   @@map("api_keys")
 }
 

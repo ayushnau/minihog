@@ -24,13 +24,29 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Fail fast with a clear message if DB is not configured (common on deploy)
+  if (!process.env.DATABASE_URL?.trim()) {
+    console.error('Get API keys: DATABASE_URL is not set');
+    return NextResponse.json(
+      { error: 'Database not configured. Set DATABASE_URL in your deployment environment.' },
+      { status: 500 }
+    );
+  }
+
   try {
     const keys = await auth.getUserApiKeys(userId);
     return NextResponse.json({ keys });
-  } catch (error: any) {
-    console.error('Get API keys error:', error);
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    const msg = err.message || String(error);
+    console.error('Get API keys error:', msg, err);
+    // In development, surface the real error to fix config/schema
+    const isDev = process.env.NODE_ENV !== 'production';
     return NextResponse.json(
-      { error: 'Failed to fetch API keys' },
+      {
+        error: 'Failed to fetch API keys',
+        ...(isDev && msg ? { detail: msg } : {}),
+      },
       { status: 500 }
     );
   }
