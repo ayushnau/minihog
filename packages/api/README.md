@@ -337,7 +337,7 @@ packages/api/
 The API is configured for Vercel serverless functions. See [deployment docs](../../../docs/deployment/) for details.
 
 **Key Environment Variables:**
-- `DATABASE_URL` - PostgreSQL connection string
+- `DATABASE_URL` - PostgreSQL connection string. **On Vercel/serverless, use a connection pooler URL** (e.g. Supabase port 6543 with `?pgbouncer=true`, or your provider’s pooler) so each request doesn’t pay 2–5s for a new DB connection.
 - `JWT_SECRET` - Secret for JWT token signing
 - `CORS_ORIGIN` - Comma-separated list of allowed origins
 - `ATTRIBUTION_WINDOW_HOURS` - Attribution window (default: 24)

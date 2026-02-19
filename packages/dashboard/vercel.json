@@ -2,5 +2,10 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "npm install",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "crons": [
+    { "path": "/api/health", "schedule": "* * * * *" },
+    { "path": "/api/auth/me", "schedule": "* * * * *" },
+    { "path": "/api/analytics/events", "schedule": "* * * * *" }
+  ]
 }

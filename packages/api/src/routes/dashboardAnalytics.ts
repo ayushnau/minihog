@@ -44,46 +44,39 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     const toDate = params.to ? new Date(params.to + 'T23:59:59.999Z') : new Date();
 
     // Use userId for data persistence after key revocation
-    // Migration has been applied - columns exist now
     const userIdToUse = requestUserId;
 
-    // Get basic event counts (using apiKeyIds only until migration is done)
-    const counts = await getEventCounts(params.event, fromDate, toDate, apiKeyIds, userIdToUse);
+    // Run independent data fetches in parallel to reduce total latency (was 5+ sequential round-trips)
+    const [counts, timeSeries, availableProperties, journeyData] = await Promise.all([
+      getEventCounts(params.event, fromDate, toDate, apiKeyIds, userIdToUse),
+      params.include_time_series
+        ? getEventTimeSeries(params.event, fromDate, toDate, apiKeyIds, userIdToUse, params.granularity)
+        : Promise.resolve([]),
+      params.include_properties
+        ? getAvailablePropertyKeys(params.event, fromDate, toDate, apiKeyIds, userIdToUse)
+        : Promise.resolve([]),
+      params.include_journeys
+        ? Promise.all([
+            getUserJourneys(fromDate, toDate, apiKeyIds, userIdToUse, 20),
+            getCommonUserPaths(fromDate, toDate, apiKeyIds, userIdToUse, 2, 10),
+          ])
+        : Promise.resolve([[] as any[], [] as any[]]),
+    ]);
 
-    // Get time series data if requested
-    const timeSeries = params.include_time_series
-      ? await getEventTimeSeries(params.event, fromDate, toDate, apiKeyIds, userIdToUse, params.granularity)
-      : [];
+    const [userJourneys, commonPaths] = journeyData;
 
-    // Get properties breakdown if requested
+    // Properties breakdown depends on available property keys; run after we have them
     let propertiesBreakdown: any[] = [];
-    let availableProperties: string[] = [];
-    
-    if (params.include_properties) {
-      // Get available property keys
-      availableProperties = await getAvailablePropertyKeys(params.event, fromDate, toDate, apiKeyIds, userIdToUse);
-      
-      // Get breakdown for specific property key (default to 'page' if not specified)
-      const propertyKey = params.property_key || 'page';
-      if (availableProperties.includes(propertyKey)) {
-        propertiesBreakdown = await getEventPropertiesBreakdown(
-          params.event,
-          fromDate,
-          toDate,
-          propertyKey,
-          apiKeyIds,
-          userIdToUse
-        );
-      }
-    }
-
-    // Get user journeys if requested
-    let userJourneys: any[] = [];
-    let commonPaths: any[] = [];
-    
-    if (params.include_journeys) {
-      userJourneys = await getUserJourneys(fromDate, toDate, apiKeyIds, userIdToUse, 20);
-      commonPaths = await getCommonUserPaths(fromDate, toDate, apiKeyIds, userIdToUse, 2, 10);
+    const propertyKey = params.property_key || 'page';
+    if (params.include_properties && availableProperties.includes(propertyKey)) {
+      propertiesBreakdown = await getEventPropertiesBreakdown(
+        params.event,
+        fromDate,
+        toDate,
+        propertyKey,
+        apiKeyIds,
+        userIdToUse
+      );
     }
 
     res.json({
