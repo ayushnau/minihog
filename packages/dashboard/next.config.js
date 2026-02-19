@@ -4,5 +4,5 @@ const nextConfig = {
   // Don't use standalone on Vercel; Vercel runs Next.js in its own environment
 }
 
-module.exports = nextConfig
+export default nextConfig
 
