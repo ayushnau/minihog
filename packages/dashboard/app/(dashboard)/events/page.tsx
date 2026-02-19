@@ -192,7 +192,7 @@ export default function EventsPage() {
                       {j.events.map((ev, i) => (
                         <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-primary/10 text-primary font-mono">
                           {ev.event_name}
-                          {ev.properties?.page && <span className="text-muted-foreground">({ev.properties.page})</span>}
+                          {ev.properties?.page != null && <span className="text-muted-foreground">({String(ev.properties.page)})</span>}
                         </span>
                       ))}
                     </div>

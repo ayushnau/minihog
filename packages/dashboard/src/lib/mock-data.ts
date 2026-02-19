@@ -1,7 +1,7 @@
 // Mock data for the MiniHog dashboard
 
 export const generateTimeSeries = (days: number) => {
-  const data = [];
+  const data: { date: string; count: number; unique_users: number }[] = [];
   const now = new Date();
   for (let i = days; i >= 0; i--) {
     const date = new Date(now);
