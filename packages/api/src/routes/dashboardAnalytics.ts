@@ -24,6 +24,7 @@ router.use(validateJWT);
  * Filtered by the authenticated user's API keys
  */
 router.get('/events', async (req: Request, res: Response, next: NextFunction) => {
+  const startMs = Date.now();
   try {
     const schema = z.object({
       event: z.string().min(1),
@@ -46,7 +47,8 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     // Use userId for data persistence after key revocation
     const userIdToUse = requestUserId;
 
-    // Run independent data fetches in parallel to reduce total latency (was 5+ sequential round-trips)
+    // Run independent data fetches in parallel to reduce total latency
+    const parallelStart = Date.now();
     const [counts, timeSeries, availableProperties, journeyData] = await Promise.all([
       getEventCounts(params.event, fromDate, toDate, apiKeyIds, userIdToUse),
       params.include_time_series
@@ -64,11 +66,14 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
     ]);
 
     const [userJourneys, commonPaths] = journeyData;
+    const parallelMs = Date.now() - parallelStart;
 
     // Properties breakdown depends on available property keys; run after we have them
     let propertiesBreakdown: any[] = [];
     const propertyKey = params.property_key || 'page';
+    let propertiesBreakdownMs = 0;
     if (params.include_properties && availableProperties.includes(propertyKey)) {
+      const t0 = Date.now();
       propertiesBreakdown = await getEventPropertiesBreakdown(
         params.event,
         fromDate,
@@ -77,7 +82,14 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
         apiKeyIds,
         userIdToUse
       );
+      propertiesBreakdownMs = Date.now() - t0;
     }
+
+    const totalMs = Date.now() - startMs;
+    // Log timing so you can see where the remaining latency is (Vercel logs / dashboard)
+    console.log(
+      `[events] parallel=${parallelMs}ms propertiesBreakdown=${propertiesBreakdownMs}ms total=${totalMs}ms`
+    );
 
     res.json({
       success: true,

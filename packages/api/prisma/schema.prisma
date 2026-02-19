@@ -25,6 +25,8 @@ model Event {
   user                  User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([eventName, timestamp])
+  @@index([userId, eventName, timestamp])
+  @@index([apiKeyId, eventName, timestamp])
   @@index([distinctId])
   @@index([timestamp])
   @@index([apiKeyId])
