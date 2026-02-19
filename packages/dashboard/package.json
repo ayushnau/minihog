@@ -1,5 +1,5 @@
 {
-  "name": "@minihog/dashboard2",
+  "name": "@minihog/dashboard",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -64,7 +64,8 @@
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
     "jose": "^5.2.0",
-    "@prisma/client": "^5.7.0"
+    "@prisma/client": "^5.7.0",
+    "next": "^14.0.4"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

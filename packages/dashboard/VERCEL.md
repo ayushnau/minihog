@@ -1,10 +1,10 @@
-# Vercel deployment (dashboard2)
+# Vercel deployment (dashboard)
 
-Configure in the Vercel dashboard; same idea as the previous dashboard.
+Configure in the Vercel dashboard.
 
 ## Project settings
 
-- **Root Directory:** `packages/dashboard2`
+- **Root Directory:** `packages/dashboard`
 - **Framework:** Next.js (auto-detected from `vercel.json`)
 
 ## Environment variables

@@ -5,7 +5,7 @@ Use the same flow as your existing Vercel dashboard project: configure in the Ve
 ## 1. Vercel project settings
 
 1. **Root Directory**  
-   Set to **`packages/dashboard2`** (so the Next.js app and its `vercel.json` are used).
+   Set to **`packages/dashboard`** (so the Next.js app and its `vercel.json` are used).
 
 2. **Environment Variables** (Settings → Environment Variables)  
    **Do this once.** Set these three variables; Vercel uses them for every build and at runtime. You don’t update them per deploy.  
@@ -22,18 +22,18 @@ Use the same flow as your existing Vercel dashboard project: configure in the Ve
 
 ## 2. Prisma and migrations
 
-- **Why Prisma in dashboard2?**  
+- **Why Prisma in dashboard?**  
   Login, register, profile, and API keys are implemented in the dashboard and talk to the DB. The API only does JWT verification and analytics; it doesn’t expose auth or keys CRUD, so the dashboard needs its own DB access (Prisma).
 
 - **Migrations**  
-  If the production DB is already the one used by the API and migrations have been run there, you don’t need to run `prisma migrate deploy` again for dashboard2. Local DB stays local; we don’t push local DB values to production.
+  If the production DB is already the one used by the API and migrations have been run there, you don’t need to run `prisma migrate deploy` again for dashboard. Local DB stays local; we don’t push local DB values to production.
 
 ## 3. Removing the old dashboard
 
-When you’re fully on dashboard2:
+When you’re fully on dashboard:
 
 1. Delete **`packages/dashboard/`** (and **`packages/dashboard3/`** if unused).
-2. In Vercel, remove or disconnect the old dashboard project. Use the project that has Root Directory = **`packages/dashboard2`** as the dashboard.
+2. In Vercel, remove or disconnect the old dashboard project. Use the project that has Root Directory = **`packages/dashboard`** as the dashboard.
 3. Update any links or docs to the new dashboard URL.
 
 No changes are needed in root `package.json` or `turbo.json`; workspaces are `packages/*` and turbo will stop building the removed package.
