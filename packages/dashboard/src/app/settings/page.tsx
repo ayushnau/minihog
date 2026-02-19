@@ -26,8 +26,8 @@ export default function SettingsPage() {
 
   return (
     <AuthGuard>
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Settings</h1>
+      <div className="container mx-auto px-4 py-6 sm:py-8 max-w-7xl">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-gray-900 dark:text-white">Settings</h1>
       
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-6">
         <div>
@@ -52,7 +52,7 @@ export default function SettingsPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Connection Status
               </label>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {healthStatus === 'checking' && (
                   <>
                     <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
@@ -73,7 +73,7 @@ export default function SettingsPage() {
                 )}
                 <button
                   onClick={checkHealth}
-                  className="ml-4 px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300"
+                  className="px-3 py-2 sm:py-1.5 text-sm bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 min-h-[44px] sm:min-h-0"
                 >
                   Retry
                 </button>

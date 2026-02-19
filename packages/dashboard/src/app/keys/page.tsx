@@ -129,9 +129,9 @@ export default function ApiKeysPage() {
 
   return (
     <AuthGuard>
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">API Keys</h1>
+      <div className="container mx-auto px-4 py-6 sm:py-8 max-w-7xl">
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">API Keys</h1>
         </div>
 
         {error && (
@@ -148,11 +148,11 @@ export default function ApiKeysPage() {
             <p className="text-sm text-green-800 dark:text-green-300 mb-4">
               Copy this key now. You won't be able to see it again.
             </p>
-            <div className="flex items-center space-x-2 bg-white dark:bg-gray-800 p-3 rounded border border-green-300 dark:border-green-700">
-              <code className="flex-1 text-sm font-mono text-gray-900 dark:text-white">{newKey}</code>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-white dark:bg-gray-800 p-3 rounded border border-green-300 dark:border-green-700">
+              <code className="flex-1 min-w-0 text-sm font-mono text-gray-900 dark:text-white break-all">{newKey}</code>
               <button
                 onClick={() => copyToClipboard(newKey)}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors shrink-0 self-start sm:self-auto min-h-[44px] sm:min-h-0"
               >
                 {copied ? (
                   <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -179,17 +179,17 @@ export default function ApiKeysPage() {
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Generate New API Key</h2>
-          <div className="flex space-x-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <input
               type="text"
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
               placeholder="Enter key name (e.g., Production, Development)"
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="flex-1 min-w-0 px-4 py-2.5 sm:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent min-h-[44px] sm:min-h-0"
             />
             <button
               onClick={generateKey}
-              className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+              className="px-6 py-2.5 sm:py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0 w-full sm:w-auto"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

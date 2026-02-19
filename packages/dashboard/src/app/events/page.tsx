@@ -95,15 +95,15 @@ export default function EventsPage() {
 
   return (
     <AuthGuard>
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Event Analytics</h1>
+      <div className="container mx-auto px-4 py-6 sm:py-8 max-w-7xl">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-gray-900 dark:text-white">Event Analytics</h1>
       
         <DateRangePicker onDateChange={handleDateChange} />
         
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-          <div className="flex items-center space-x-4">
-            <div className="flex-1">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Event Name:</label>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-3 flex-wrap">
+            <div className="flex-1 min-w-0 w-full sm:max-w-md">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1">Event Name:</label>
               <input
                 type="text"
                 value={eventName}
@@ -114,15 +114,15 @@ export default function EventsPage() {
                   }
                 }}
                 placeholder="e.g., button_click, page_view, signup"
-                className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-full max-w-md"
+                className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 sm:py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-full min-h-[44px] sm:min-h-0"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Granularity:</label>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1 sm:mr-2">Granularity:</label>
               <select
                 value={granularity}
                 onChange={(e) => setGranularity(e.target.value as 'day' | 'hour')}
-                className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 sm:py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-h-[44px] sm:min-h-0"
               >
                 <option value="day">Daily</option>
                 <option value="hour">Hourly</option>
@@ -131,7 +131,7 @@ export default function EventsPage() {
             <button
               onClick={handleLoad}
               disabled={!eventName.trim()}
-              className="px-4 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="px-4 py-2.5 sm:py-1.5 bg-primary-600 text-white rounded text-sm hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0 w-full sm:w-auto"
             >
               Load
             </button>
@@ -218,7 +218,7 @@ export default function EventsPage() {
                 <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
                   Event Trends Over Time ({granularity === 'day' ? 'Daily' : 'Hourly'})
                 </h3>
-                <div className="h-80">
+                <div className="h-64 sm:h-80 min-h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={data.time_series}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -264,7 +264,7 @@ export default function EventsPage() {
             {/* Properties Breakdown */}
             {data.properties_breakdown && data.properties_breakdown.length > 0 && (
               <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                     Breakdown by {selectedProperty}
                   </h3>
@@ -272,7 +272,7 @@ export default function EventsPage() {
                     <select
                       value={selectedProperty}
                       onChange={(e) => setSelectedProperty(e.target.value)}
-                      className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 sm:py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-full sm:w-auto min-h-[44px] sm:min-h-0"
                     >
                       {data.available_properties.map((prop) => (
                         <option key={prop} value={prop}>
@@ -325,9 +325,9 @@ export default function EventsPage() {
                 </div>
                 <div className="mt-4 space-y-2">
                   {data.properties_breakdown.slice(0, 5).map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded">
+                    <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 p-3 sm:p-2 bg-gray-50 dark:bg-gray-700 rounded">
                       <span className="text-sm font-medium text-gray-900 dark:text-white">{item.value}</span>
-                      <div className="flex items-center space-x-4">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                         <span className="text-sm text-gray-600 dark:text-gray-300">{item.count} events</span>
                         <span className="text-sm text-gray-500 dark:text-gray-400">{item.unique_users} end users</span>
                       </div>
@@ -383,17 +383,15 @@ export default function EventsPage() {
                 <div className="space-y-3">
                   {data.common_paths.map((path, index) => (
                     <div key={index} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-2">
                         <span className="text-sm font-medium text-gray-900 dark:text-white">
                           Path #{index + 1}
                         </span>
-                        <div className="flex items-center space-x-4">
-                          <span className="text-sm text-gray-600 dark:text-gray-300">
-                            {path.count} end users ({path.percentage.toFixed(1)}%)
-                          </span>
-                        </div>
+                        <span className="text-sm text-gray-600 dark:text-gray-300">
+                          {path.count} end users ({path.percentage.toFixed(1)}%)
+                        </span>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <div className="flex flex-wrap items-center gap-2 mt-2 overflow-x-auto">
                         {path.path.map((step, stepIndex) => {
                           // Get button_id from path_with_ids if available
                           const stepWithId = path.path_with_ids?.[stepIndex];

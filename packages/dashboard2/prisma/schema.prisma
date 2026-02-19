@@ -1,0 +1,44 @@
+// Prisma schema for MiniHog Dashboard (shares database with API)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Users table - stores dashboard user accounts
+model User {
+  id        String    @id @default(uuid())
+  username  String    @unique
+  email     String    @unique
+  passwordHash String @map("password_hash")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  apiKeys   ApiKey[]
+
+  @@map("users")
+}
+
+// API Keys table - stores API keys for users (soft delete via deletedAt)
+model ApiKey {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  key       String    @unique
+  name      String
+  lastUsed  DateTime? @map("last_used")
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at") // Soft delete: set when key is revoked
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([key])
+  @@index([deletedAt])
+  @@map("api_keys")
+}
+
+

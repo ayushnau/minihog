@@ -88,15 +88,15 @@ export default function RetentionPage() {
 
   return (
     <AuthGuard>
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Retention Analysis</h1>
+      <div className="container mx-auto px-4 py-6 sm:py-8 max-w-7xl">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-gray-900 dark:text-white">Retention Analysis</h1>
       
       <DateRangePicker onDateChange={handleDateChange} />
       
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-3 flex-wrap">
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Cohort Event:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1 sm:mr-2">Cohort Event:</label>
             <input
               type="text"
               value={cohort}
@@ -108,23 +108,23 @@ export default function RetentionPage() {
                 }
               }}
               placeholder="e.g., install"
-              className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 sm:py-1.5 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-h-[44px] sm:min-h-0 w-full sm:w-auto"
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Day:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-1 sm:mr-2">Day:</label>
             <input
               type="number"
               value={day}
               onChange={(e) => setDay(parseInt(e.target.value) || 7)}
               min="1"
-              className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-sm w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 sm:py-1.5 text-sm w-20 bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-h-[44px] sm:min-h-0"
             />
           </div>
           <button
             onClick={loadData}
             disabled={!cohort.trim()}
-            className="px-4 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-4 py-2.5 sm:py-1.5 bg-primary-600 text-white rounded text-sm hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0"
           >
             Analyze
           </button>
@@ -165,15 +165,15 @@ export default function RetentionPage() {
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Retention Details</h3>
             <div className="space-y-4">
-              <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 p-4 bg-gray-50 dark:bg-gray-700 rounded">
                 <span className="font-medium text-gray-900 dark:text-white">Cohort Event:</span>
                 <span className="text-gray-700 dark:text-gray-300">{data.cohort}</span>
               </div>
-              <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 p-4 bg-gray-50 dark:bg-gray-700 rounded">
                 <span className="font-medium text-gray-900 dark:text-white">Retention Day:</span>
                 <span className="text-gray-700 dark:text-gray-300">Day {data.day}</span>
               </div>
-              <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 p-4 bg-gray-50 dark:bg-gray-700 rounded">
                 <span className="font-medium text-gray-900 dark:text-white">Date Range:</span>
                 <span className="text-gray-700 dark:text-gray-300">
                   {new Date(data.from).toLocaleDateString()} - {new Date(data.to).toLocaleDateString()}

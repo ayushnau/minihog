@@ -110,12 +110,12 @@ export function DashboardOverview() {
         ) : (
           <div className="space-y-3">
             {stats.events.map((event) => (
-              <div key={event.event} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                <div>
+              <div key={event.event} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                <div className="min-w-0">
                   <p className="font-semibold text-gray-900 dark:text-white text-lg">{event.event}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{event.unique_users} unique users</p>
                 </div>
-                <p className="text-2xl font-bold text-primary-600 dark:text-primary-400">{event.total_count.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-primary-600 dark:text-primary-400 shrink-0">{event.total_count.toLocaleString()}</p>
               </div>
             ))}
           </div>

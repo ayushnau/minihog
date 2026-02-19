@@ -42,12 +42,12 @@ export default function AttributionPage() {
 
   return (
     <AuthGuard>
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Attribution & Campaign Analytics</h1>
+      <div className="container mx-auto px-4 py-6 sm:py-8 max-w-7xl">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-gray-900 dark:text-white">Attribution & Campaign Analytics</h1>
       
       <button
         onClick={loadData}
-        className="mb-6 px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
+        className="mb-6 px-4 py-2.5 sm:py-2 bg-primary-600 text-white rounded hover:bg-primary-700 min-h-[44px] sm:min-h-0"
       >
         Refresh Data
       </button>

@@ -59,33 +59,35 @@ export default function FunnelPage() {
 
   return (
     <AuthGuard>
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Funnel Analysis</h1>
+      <div className="container mx-auto px-4 py-6 sm:py-8 max-w-7xl">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-gray-900 dark:text-white">Funnel Analysis</h1>
       
       <DateRangePicker onDateChange={handleDateChange} />
       
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-4">Funnel Steps (comma-separated):</label>
-        <input
-          type="text"
-          value={steps}
-          onChange={(e) => setSteps(e.target.value)}
-          onKeyDown={(e) => {
-            // Only trigger on Enter if steps are not empty
-            if (e.key === 'Enter' && steps.trim()) {
-              loadData();
-            }
-          }}
-          placeholder="e.g., install,signup,purchase"
-          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-sm flex-1 min-w-[300px] bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-        />
-        <button
-          onClick={loadData}
-          disabled={!steps.trim()}
-          className="ml-4 px-4 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-        >
-          Analyze
-        </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 flex-wrap">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0 w-full sm:w-auto">Funnel Steps (comma-separated):</label>
+          <input
+            type="text"
+            value={steps}
+            onChange={(e) => setSteps(e.target.value)}
+            onKeyDown={(e) => {
+              // Only trigger on Enter if steps are not empty
+              if (e.key === 'Enter' && steps.trim()) {
+                loadData();
+              }
+            }}
+            placeholder="e.g., install,signup,purchase"
+            className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 sm:py-1.5 text-sm flex-1 min-w-0 bg-white dark:bg-gray-700 text-gray-900 dark:text-white min-h-[44px] sm:min-h-0"
+          />
+          <button
+            onClick={loadData}
+            disabled={!steps.trim()}
+            className="w-full sm:w-auto px-4 py-2.5 sm:py-1.5 bg-primary-600 text-white rounded text-sm hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0"
+          >
+            Analyze
+          </button>
+        </div>
       </div>
 
       {loading && (
@@ -125,8 +127,8 @@ export default function FunnelPage() {
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Funnel Steps</h3>
             <div className="space-y-4">
               {data.funnel.map((step, index) => (
-                <div key={step.step} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded">
-                  <div>
+                <div key={step.step} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-4 bg-gray-50 dark:bg-gray-700 rounded">
+                  <div className="min-w-0">
                     <p className="font-medium text-gray-900 dark:text-white">
                       Step {step.step}: {step.event_name}
                     </p>
@@ -136,7 +138,7 @@ export default function FunnelPage() {
                       </p>
                     )}
                   </div>
-                  <p className="text-2xl font-bold text-primary-600">
+                  <p className="text-2xl font-bold text-primary-600 shrink-0">
                     {step.users.toLocaleString()}
                   </p>
                 </div>
