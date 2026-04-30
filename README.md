@@ -20,18 +20,112 @@ Quick links:
 ## 🏗️ Architecture
 
 ```
-Client App
-   |
-   |  (JS SDK)
-   v
-Ingestion API  ---> Validation ---> Event Queue
-                                   |
-                                   v
-                                MySQL
-                                   |
-                         Analytics & Attribution Engine
-                                   |
-                               Query APIs
+┌─────────────────┐         ┌──────────────────────────────────────────┐
+│   Client App    │         │           Dashboard (Next.js)            │
+│   (Browser)     │         │  React + Tailwind + shadcn-ui + Recharts │
+└────────┬────────┘         └──────────────────┬───────────────────────┘
+         │ JS SDK                              │ API Proxy (JWT Auth)
+         │ (track, flush)                      │
+         v                                     v
+┌──────────────────────────────────────────────────────────┐
+│                   Backend API (Express)                   │
+│                                                          │
+│  ┌──────────┐  ┌────────────┐  ┌───────────────────────┐ │
+│  │ Ingestion│  │    Auth     │  │   Analytics Engine    │ │
+│  │ /track   │  │ /api/auth   │  │ events, funnel,       │ │
+│  │ /click   │  │ JWT + Keys  │  │ retention, attribution│ │
+│  │ /install │  │             │  │ timeseries, journeys  │ │
+│  └────┬─────┘  └─────┬──────┘  └──────────┬────────────┘ │
+│       │              │                     │              │
+│       v              v                     v              │
+│  ┌──────────────────────────────────────────────┐        │
+│  │          Prisma ORM + PostgreSQL              │        │
+│  │  Events | Clicks | Installs | Users | ApiKeys │        │
+│  └──────────────────────────────────────────────┘        │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Event Ingestion Flow
+
+```
+Client App                        SDK                           API                         PostgreSQL
+   │                               │                             │                              │
+   │  MiniHog.track(event, props)  │                             │                              │
+   │──────────────────────────────>│                             │                              │
+   │                               │  (queue event locally)      │                              │
+   │                               │──────┐                      │                              │
+   │                               │      │ batch full /         │                              │
+   │                               │<─────┘ flush interval /     │                              │
+   │                               │        page unload          │                              │
+   │                               │                             │                              │
+   │                               │  POST /track/batch          │                              │
+   │                               │  X-API-Key: <key>           │                              │
+   │                               │────────────────────────────>│                              │
+   │                               │                             │  Validate API key            │
+   │                               │                             │─────────────────────────────>│
+   │                               │                             │  Idempotency check           │
+   │                               │                             │─────────────────────────────>│
+   │                               │                             │  Batch insert events         │
+   │                               │                             │─────────────────────────────>│
+   │                               │                             │                              │
+   │                               │         200 OK              │                              │
+   │                               │<────────────────────────────│                              │
+```
+
+### Attribution Flow (Last-Click)
+
+```
+1. Click recorded:     POST /click { device_id, campaign_id, timestamp }
+                         │
+                         v
+                       Clicks table stores the click
+                         
+2. Install recorded:   POST /install { device_id, timestamp }
+                         │
+                         v
+                       Attribution Engine runs:
+                         │
+                         ├── Query all clicks for this device_id
+                         │   within the attribution window (default 24h)
+                         │
+                         ├── Select the most recent click (last-click model)
+                         │
+                         └── Store attributed_campaign_id with the install
+
+3. Subsequent events:  Events can carry the attributed_campaign_id
+                       for campaign performance analysis
+```
+
+### Dashboard Authentication Flow
+
+```
+Browser                     Dashboard (Next.js)              Backend API
+   │                              │                              │
+   │  POST /signin                │                              │
+   │  { username, password }      │                              │
+   │─────────────────────────────>│                              │
+   │                              │  POST /api/auth/login        │
+   │                              │─────────────────────────────>│
+   │                              │                              │  Verify credentials
+   │                              │                              │  Issue JWT (HS256)
+   │                              │     Set auth-token cookie    │
+   │                              │<─────────────────────────────│
+   │  Set HTTP-only cookie        │                              │
+   │<─────────────────────────────│                              │
+   │                              │                              │
+   │  GET /dashboard              │                              │
+   │─────────────────────────────>│                              │
+   │                              │  GET /api/analytics/events   │
+   │                              │  (forwards JWT cookie)       │
+   │                              │─────────────────────────────>│
+   │                              │                              │  Validate JWT
+   │                              │                              │  Fetch user's API keys
+   │                              │                              │  Query events filtered
+   │                              │                              │  by userId/apiKeyIds
+   │                              │       Analytics data         │
+   │                              │<─────────────────────────────│
+   │     Rendered dashboard       │                              │
+   │<─────────────────────────────│                              │
 ```
 
 ## 📦 Monorepo Structure
@@ -87,9 +181,18 @@ npm run dev
 ```
 
 The API will be available at `http://localhost:3000`  
-The Dashboard will be available at `http://localhost:3001`
+The Dashboard will be available at `http://localhost:3002`
 
 ## 📚 API Endpoints
+
+### Authentication
+
+All event ingestion and analytics endpoints require an API key via one of:
+- `X-API-Key` header
+- `Authorization: Bearer <key>` header
+- `?api_key=<key>` query parameter
+
+Dashboard endpoints require JWT authentication via the `auth-token` cookie.
 
 ### Event Ingestion
 
@@ -143,6 +246,32 @@ Returns retention percentage (users who returned after N days).
 **GET `/analytics/attribution`**
 
 Returns attribution analytics (installs and purchases per campaign).
+
+### Dashboard Analytics (JWT Required)
+
+**GET `/dashboard/analytics/events`** - Comprehensive event analytics with optional params:
+- `include_time_series=true` - Include time series data
+- `include_properties=true` - Include properties breakdown
+- `include_journeys=true` - Include user journeys
+- `property_key=page` - Property key to break down by
+- `granularity=day|hour` - Time series granularity
+
+**GET `/dashboard/analytics/funnel`** - User-scoped funnel analysis
+
+**GET `/dashboard/analytics/retention`** - User-scoped retention analysis
+
+**GET `/dashboard/analytics/attribution`** - User-scoped attribution data
+
+### Auth & Key Management
+
+- **POST `/api/auth/register`** - Create account
+- **POST `/api/auth/login`** - Login (returns JWT in `auth-token` cookie)
+- **POST `/api/auth/logout`** - Clear auth token
+- **GET `/api/auth/me`** - Current user profile
+- **POST `/api/auth/change-password`** - Update password
+- **POST `/api/keys`** - Generate new API key
+- **GET `/api/keys`** - List user's API keys
+- **DELETE `/api/keys?id={id}`** - Revoke an API key
 
 ## 📦 JavaScript SDK
 
@@ -226,18 +355,19 @@ The attribution window is configurable via `ATTRIBUTION_WINDOW_HOURS` environmen
 ## 🗄️ Database Schema
 
 ### Events Table
-- `id` (String/UUID, PK)
+- `id` (UUID, PK)
 - `event_name` (String)
 - `distinct_id` (String)
 - `timestamp` (DateTime)
 - `properties` (JSON)
 - `attributed_campaign_id` (String, nullable)
 - `api_key_id` (String, nullable) - Links event to API key
+- `user_id` (String, nullable) - Links event to dashboard user
 
-**Indexes:** `(event_name, timestamp)`, `distinct_id`, `timestamp`, `api_key_id`
+**Indexes:** `(event_name, timestamp)`, `(user_id, event_name, timestamp)`, `(api_key_id, event_name, timestamp)`, `distinct_id`, `timestamp`, `api_key_id`, `user_id`
 
 ### Clicks Table
-- `id` (String/CUID, PK)
+- `id` (UUID, PK)
 - `device_id` (String)
 - `campaign_id` (String)
 - `timestamp` (DateTime)
@@ -245,23 +375,48 @@ The attribution window is configurable via `ATTRIBUTION_WINDOW_HOURS` environmen
 **Indexes:** `(device_id, timestamp)`, `campaign_id`
 
 ### Installs Table
-- `id` (String/CUID, PK)
+- `id` (UUID, PK)
 - `device_id` (String)
 - `install_time` (DateTime)
 - `attributed_campaign_id` (String, nullable)
 
 **Indexes:** `device_id`, `attributed_campaign_id`, `install_time`
 
+### Users Table
+- `id` (UUID, PK)
+- `username` (String, unique)
+- `email` (String, unique)
+- `password_hash` (String)
+- `created_at` (DateTime)
+- `updated_at` (DateTime)
+
+### API Keys Table
+- `id` (UUID, PK)
+- `user_id` (String, FK -> Users)
+- `key` (String, unique)
+- `name` (String)
+- `last_used` (DateTime, nullable)
+- `deleted_at` (DateTime, nullable) - Soft delete for revocation
+
+**Indexes:** `user_id`, `key`, `deleted_at`
+
 ## 🧪 Testing
 
 ```bash
-# Run all tests (when implemented)
-npm test
-
-# Test API endpoints
+# Test API endpoints (API key required)
 curl -X POST http://localhost:3000/track \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
   -d '{"event":"test","distinct_id":"user_1","properties":{}}'
+
+# Test click tracking (no auth required)
+curl -X POST http://localhost:3000/click \
+  -H "Content-Type: application/json" \
+  -d '{"device_id":"device_1","campaign_id":"campaign_1","timestamp":1706351800000}'
+
+# Test analytics query
+curl "http://localhost:3000/analytics/events?event=test&from=2026-01-01&to=2026-12-31" \
+  -H "X-API-Key: your-api-key"
 ```
 
 ## 🛠️ Development
