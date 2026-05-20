@@ -101,7 +101,22 @@ export interface AttributionResponse {
   purchases_by_campaign: AttributionCampaign[];
 }
 
+export interface EventNameItem {
+  name: string;
+  count: number;
+}
+
+export interface EventNamesResponse {
+  success: boolean;
+  event_names: EventNameItem[];
+}
+
 export const api = {
+  getEventNames: async (): Promise<EventNameItem[]> => {
+    const { data } = await apiClient.get<EventNamesResponse>('/api/analytics/event-names');
+    return data.event_names;
+  },
+
   getEventCounts: async (
     event: string,
     from: string,

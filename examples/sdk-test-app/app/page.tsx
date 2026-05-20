@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import MiniHog from 'minihog-sdk';
 
 interface LogEntry {
@@ -9,97 +9,56 @@ interface LogEntry {
   type: 'info' | 'success' | 'error';
 }
 
+const PRESET_EVENTS = [
+  { name: 'page_view', label: 'Page View', properties: { page: '/home' } },
+  { name: 'signup', label: 'Sign Up', properties: { method: 'email' } },
+  { name: 'button_click', label: 'Button Click', properties: { button_id: 'cta-hero', page: '/home' } },
+  { name: 'purchase', label: 'Purchase', properties: { amount: 29.99, currency: 'USD', product: 'Pro Plan' } },
+  { name: 'search', label: 'Search', properties: { query: 'analytics' } },
+  { name: 'add_to_cart', label: 'Add to Cart', properties: { product: 'Pro Plan', price: 29.99 } },
+];
+
 export default function Home() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [environment, setEnvironment] = useState<'production' | 'sandbox' | 'development'>('development');
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [eventName, setEventName] = useState('');
-  const [eventProperties, setEventProperties] = useState('{}');
-  const [pageForButtonClick, setPageForButtonClick] = useState('home');
-  const [buttonId, setButtonId] = useState('signup-btn');
+  const [distinctId, setDistinctId] = useState('');
+  const [identifyId, setIdentifyId] = useState('');
 
-  useEffect(() => {
-    // Check if SDK is already initialized
+  // Custom event state
+  const [customEventName, setCustomEventName] = useState('');
+  const [customProperties, setCustomProperties] = useState('{}');
+
+  const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
+    setLogs((prev) => [
+      { timestamp: new Date().toLocaleTimeString(), message, type },
+      ...prev,
+    ].slice(0, 50));
+  }, []);
+
+  const updateDistinctId = useCallback(() => {
     try {
-      // @ts-ignore - accessing internal state for testing
-      if (MiniHog._instance && MiniHog._instance.config) {
-        setIsInitialized(true);
-        addLog('SDK already initialized', 'info');
-      }
-    } catch (e) {
+      setDistinctId(MiniHog.getDistinctId());
+    } catch {
       // Not initialized
     }
   }, []);
 
-  const addLog = (message: string, type: LogEntry['type'] = 'info') => {
-    setLogs((prev) => [
-      ...prev,
-      {
-        timestamp: new Date().toLocaleTimeString(),
-        message,
-        type,
-      },
-    ]);
-  };
-
   const handleInitialize = () => {
     try {
-      let properties = {};
-      if (eventProperties.trim()) {
-        properties = JSON.parse(eventProperties);
-      }
-
       MiniHog.init({
         environment,
         apiKey: apiKey || undefined,
-        batchSize: 5, // Small batch for testing
-        flushInterval: 3000, // 3 seconds for testing
+        batchSize: 1,
+        flushInterval: 2000,
       });
-
       setIsInitialized(true);
-      addLog(`SDK initialized with environment: ${environment}`, 'success');
-      if (apiKey) {
-        addLog(`API Key configured: ${apiKey.substring(0, 8)}...`, 'info');
-      }
+      updateDistinctId();
+      addLog(`SDK initialized (${environment}, batch: 1, flush: 2s)`, 'success');
+      if (apiKey) addLog(`API Key: ${apiKey.substring(0, 12)}...`, 'info');
     } catch (error: any) {
-      addLog(`Initialization error: ${error.message}`, 'error');
-    }
-  };
-
-  const handleTrack = () => {
-    if (!isInitialized) {
-      addLog('Please initialize SDK first', 'error');
-      return;
-    }
-
-    try {
-      let properties = {};
-      if (eventProperties.trim()) {
-        properties = JSON.parse(eventProperties);
-      }
-
-      MiniHog.track(eventName || 'test_event', properties);
-      addLog(`Event tracked: ${eventName || 'test_event'}`, 'success');
-      if (Object.keys(properties).length > 0) {
-        addLog(`Properties: ${JSON.stringify(properties)}`, 'info');
-      }
-    } catch (error: any) {
-      addLog(`Track error: ${error.message}`, 'error');
-    }
-  };
-
-  const handleFlush = () => {
-    if (!isInitialized) {
-      addLog('Please initialize SDK first', 'error');
-      return;
-    }
-
-    try {
-      MiniHog.flush();
-      addLog('Events flushed manually', 'success');
-    } catch (error: any) {
-      addLog(`Flush error: ${error.message}`, 'error');
+      addLog(`Init error: ${error.message}`, 'error');
     }
   };
 
@@ -107,200 +66,239 @@ export default function Home() {
     try {
       MiniHog.reset();
       setIsInitialized(false);
+      setDistinctId('');
+      setIdentifyId('');
       addLog('SDK reset', 'info');
     } catch (error: any) {
       addLog(`Reset error: ${error.message}`, 'error');
     }
   };
 
+  const handleIdentify = () => {
+    if (!identifyId.trim()) {
+      addLog('Enter a user ID to identify', 'error');
+      return;
+    }
+    try {
+      MiniHog.identify(identifyId.trim());
+      updateDistinctId();
+      addLog(`User identified as: ${identifyId.trim()}`, 'success');
+    } catch (error: any) {
+      addLog(`Identify error: ${error.message}`, 'error');
+    }
+  };
+
+  const trackEvent = (name: string, properties: Record<string, any>) => {
+    if (!isInitialized) {
+      addLog('Initialize the SDK first', 'error');
+      return;
+    }
+    try {
+      MiniHog.track(name, properties);
+      const propsStr = Object.keys(properties).length > 0
+        ? ` | ${Object.entries(properties).map(([k, v]) => `${k}: ${v}`).join(', ')}`
+        : '';
+      addLog(`Tracked: ${name}${propsStr}`, 'success');
+    } catch (error: any) {
+      addLog(`Track error: ${error.message}`, 'error');
+    }
+  };
+
+  const handleTrackCustom = () => {
+    if (!customEventName.trim()) {
+      addLog('Enter an event name', 'error');
+      return;
+    }
+    try {
+      const props = customProperties.trim() ? JSON.parse(customProperties) : {};
+      trackEvent(customEventName.trim(), props);
+    } catch (error: any) {
+      addLog(`Invalid JSON: ${error.message}`, 'error');
+    }
+  };
+
+  const handleFlush = () => {
+    try {
+      MiniHog.flush();
+      addLog('Flushed all queued events', 'success');
+    } catch (error: any) {
+      addLog(`Flush error: ${error.message}`, 'error');
+    }
+  };
+
   return (
     <div className="container">
       <h1>MiniHog SDK Test App</h1>
-      <p style={{ marginBottom: '2rem', color: '#666' }}>
-        Test your local MiniHog SDK with hot reload. Changes to the SDK will automatically reflect here.
+      <p className="subtitle">
+        Interactive playground to test event tracking, user identification, and SDK features.
       </p>
 
-      {/* SDK Status */}
+      {/* Setup Section */}
       <div className="card">
-        <h2>SDK Status</h2>
-        <p>
-          Status:{' '}
+        <div className="card-header">
+          <h2>Setup</h2>
           <span className={`status ${isInitialized ? 'initialized' : 'not-initialized'}`}>
-            {isInitialized ? 'Initialized' : 'Not Initialized'}
+            {isInitialized ? 'Connected' : 'Not Connected'}
           </span>
-        </p>
-      </div>
-
-      {/* Initialization */}
-      <div className="card">
-        <h2>Initialize SDK</h2>
-        <div>
-          <label className="label">Environment</label>
-          <select
-            className="input"
-            value={environment}
-            onChange={(e) => setEnvironment(e.target.value as any)}
-            disabled={isInitialized}
-          >
-            <option value="development">Development (localhost:3000)</option>
-            <option value="sandbox">Sandbox</option>
-            <option value="production">Production</option>
-          </select>
         </div>
-        <div>
-          <label className="label">API Key (optional for testing)</label>
-          <input
-            type="text"
-            className="input"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="Enter your API key"
-            disabled={isInitialized}
-          />
-        </div>
-        <button className="button" onClick={handleInitialize} disabled={isInitialized}>
-          Initialize SDK
-        </button>
-        {isInitialized && (
-          <button className="button" onClick={handleReset} style={{ background: '#ef4444' }}>
-            Reset SDK
-          </button>
-        )}
-      </div>
 
-      {/* Track Events */}
-      {isInitialized && (
-        <div className="card">
-          <h2>Track Events</h2>
-          <div>
-            <label className="label">Event Name</label>
-            <input
-              type="text"
-              className="input"
-              value={eventName}
-              onChange={(e) => setEventName(e.target.value)}
-              placeholder="e.g., button_click, purchase, signup"
-            />
-          </div>
-          <div>
-            <label className="label">Event Properties (JSON)</label>
-            <textarea
-              className="input"
-              value={eventProperties}
-              onChange={(e) => setEventProperties(e.target.value)}
-              placeholder='{"amount": 100, "currency": "USD"}'
-              rows={4}
-            />
-          </div>
-          <button className="button" onClick={handleTrack}>
-            Track Event
-          </button>
-          <button className="button" onClick={handleFlush}>
-            Flush Events
-          </button>
-        </div>
-      )}
-
-      {/* Quick Test Buttons */}
-      {isInitialized && (
-        <div className="card">
-          <h2>Quick Tests</h2>
-          <button
-            className="button"
-            onClick={() => {
-              setEventName('page_view');
-              setEventProperties('{"page": "home"}');
-            }}
-          >
-            Set: page_view
-          </button>
-          <button
-            className="button"
-            onClick={() => {
-              setEventName('button_click');
-              setEventProperties(`{"button_name": "signup", "page": "${pageForButtonClick}", "button_id": "${buttonId}"}`);
-            }}
-          >
-            Set: button_click
-          </button>
-          <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <label className="label" style={{ margin: 0, fontSize: '0.875rem' }}>Page:</label>
-              <select
-                className="input"
-                value={pageForButtonClick}
-                onChange={(e) => setPageForButtonClick(e.target.value)}
-                style={{ width: 'auto', minWidth: '120px', padding: '0.375rem 0.5rem' }}
-              >
-                <option value="home">home</option>
-                <option value="pricing">pricing</option>
-                <option value="about">about</option>
-                <option value="contact">contact</option>
-                <option value="signup">signup</option>
-                <option value="dashboard">dashboard</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <label className="label" style={{ margin: 0, fontSize: '0.875rem' }}>Button ID:</label>
+        {!isInitialized ? (
+          <>
+            <div className="field">
+              <label className="label">API Key</label>
               <input
                 type="text"
                 className="input"
-                value={buttonId}
-                onChange={(e) => setButtonId(e.target.value)}
-                placeholder="e.g., signup-btn"
-                style={{ width: 'auto', minWidth: '120px', padding: '0.375rem 0.5rem' }}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="mh_xxxx..."
               />
             </div>
+            <div className="field">
+              <label className="label">Environment</label>
+              <select className="input" value={environment} onChange={(e) => setEnvironment(e.target.value as any)}>
+                <option value="development">Development (localhost:3000)</option>
+                <option value="sandbox">Sandbox</option>
+                <option value="production">Production</option>
+              </select>
+            </div>
+            <button className="btn btn-primary" onClick={handleInitialize}>
+              Connect SDK
+            </button>
+          </>
+        ) : (
+          <div className="info-grid">
+            <div className="info-row">
+              <span className="info-label">API Key</span>
+              <code className="code-inline">{apiKey ? `${apiKey.substring(0, 20)}...` : 'None'}</code>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Environment</span>
+              <code className="code-inline">{environment}</code>
+            </div>
+            <div className="info-row">
+              <span className="info-label">Distinct ID</span>
+              <code className="code-inline">{distinctId}</code>
+            </div>
+            <div style={{ marginTop: '0.5rem' }}>
+              <button className="btn btn-danger btn-sm" onClick={handleReset}>
+                Disconnect
+              </button>
+            </div>
           </div>
-          <button
-            className="button"
-            onClick={() => {
-              setEventName('purchase');
-              setEventProperties('{"amount": 299, "currency": "USD"}');
-            }}
-          >
-            Set: purchase
-          </button>
-        </div>
+        )}
+      </div>
+
+      {isInitialized && (
+        <>
+          {/* Identify User */}
+          <div className="card">
+            <h2>Identify User</h2>
+            <p className="hint">
+              Link events to a real user ID from your auth system. After identifying, all events use this ID as distinct_id.
+            </p>
+            <div className="row">
+              <input
+                type="text"
+                className="input"
+                value={identifyId}
+                onChange={(e) => setIdentifyId(e.target.value)}
+                placeholder="e.g. user_123, john@example.com"
+                style={{ flex: 1 }}
+              />
+              <button className="btn btn-primary btn-sm" onClick={handleIdentify}>
+                Identify
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Track */}
+          <div className="card">
+            <h2>Quick Track</h2>
+            <p className="hint">
+              One-click event tracking. Each event includes properties like <code>page</code>, <code>button_id</code>, <code>amount</code> etc.
+            </p>
+            <div className="preset-grid">
+              {PRESET_EVENTS.map((evt) => (
+                <button
+                  key={evt.name}
+                  className="preset-btn"
+                  onClick={() => trackEvent(evt.name, evt.properties)}
+                >
+                  <span className="preset-name">{evt.label}</span>
+                  <span className="preset-event">{evt.name}</span>
+                  <span className="preset-props">
+                    {Object.entries(evt.properties).map(([k, v]) => (
+                      <span key={k} className="preset-prop-tag">{k}: {String(v)}</span>
+                    ))}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom Event */}
+          <div className="card">
+            <h2>Custom Event</h2>
+            <div className="row">
+              <div className="field" style={{ flex: 1 }}>
+                <label className="label">Event Name</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={customEventName}
+                  onChange={(e) => setCustomEventName(e.target.value)}
+                  placeholder="e.g. form_submit"
+                />
+              </div>
+            </div>
+            <div className="field">
+              <label className="label">Properties (JSON)</label>
+              <textarea
+                className="input"
+                value={customProperties}
+                onChange={(e) => setCustomProperties(e.target.value)}
+                placeholder='{"form_id": "contact-form", "page": "/contact"}'
+                rows={3}
+              />
+            </div>
+            <div className="row">
+              <button className="btn btn-primary" onClick={handleTrackCustom}>
+                Track Event
+              </button>
+              <button className="btn btn-secondary" onClick={handleFlush}>
+                Flush Queue
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Event Log */}
       <div className="card">
-        <h2>Event Log</h2>
+        <div className="card-header">
+          <h2>Event Log</h2>
+          {logs.length > 0 && (
+            <button className="btn btn-secondary btn-sm" onClick={() => setLogs([])}>
+              Clear
+            </button>
+          )}
+        </div>
         <div className="log">
           {logs.length === 0 ? (
-            <p style={{ color: '#999' }}>No events yet. Initialize the SDK and start tracking!</p>
+            <p className="hint" style={{ textAlign: 'center', padding: '2rem 0' }}>
+              Events will appear here as you track them.
+            </p>
           ) : (
             logs.map((log, index) => (
               <div key={index} className={`log-entry ${log.type}`}>
-                <strong>[{log.timestamp}]</strong> {log.message}
+                <span className="log-time">{log.timestamp}</span>
+                <span>{log.message}</span>
               </div>
             ))
           )}
         </div>
-        {logs.length > 0 && (
-          <button
-            className="button"
-            onClick={() => setLogs([])}
-            style={{ background: '#6b7280', marginTop: '1rem' }}
-          >
-            Clear Log
-          </button>
-        )}
-      </div>
-
-      {/* Instructions */}
-      <div className="card" style={{ background: '#f0f9ff', border: '1px solid #0ea5e9' }}>
-        <h3 style={{ color: '#0c4a6e' }}>💡 Development Tips</h3>
-        <ul style={{ marginTop: '1rem', paddingLeft: '1.5rem', color: '#075985' }}>
-          <li>Make changes to SDK in <code>packages/sdk/src/</code></li>
-          <li>Run <code>npm run build</code> in <code>packages/sdk/</code> to rebuild</li>
-          <li>Or use <code>npm run dev</code> for watch mode (auto-rebuild)</li>
-          <li>Refresh this page to see changes</li>
-          <li>Check browser console for detailed logs</li>
-        </ul>
       </div>
     </div>
   );
 }
-

@@ -73,6 +73,21 @@ export class Session {
   }
 
   /**
+   * Set a custom user ID (from the merchant's auth system)
+   * All subsequent events will include this as the distinct_id
+   */
+  identify(userId: string): void {
+    this.distinctId = userId;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.setItem(this.STORAGE_KEY, userId);
+      } catch (e) {
+        // Ignore
+      }
+    }
+  }
+
+  /**
    * Reset the distinct ID (useful for testing)
    */
   reset(): void {

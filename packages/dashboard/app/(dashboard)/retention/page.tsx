@@ -4,23 +4,36 @@ import { useState, useEffect } from 'react';
 import DateRangePicker from '@/components/DateRangePicker';
 import KpiCard from '@/components/KpiCard';
 import { Input } from '@/components/ui/input';
-import { api, RetentionResponse } from '@/lib/api';
-import { useDebounce } from '@/lib/useDebounce';
+import { api, RetentionResponse, EventNameItem } from '@/lib/api';
 import { format, subDays } from 'date-fns';
 
 export default function RetentionPage() {
   const [from, setFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [to, setTo] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [cohort, setCohort] = useState('install');
+  const [cohort, setCohort] = useState('');
   const [day, setDay] = useState(7);
   const [data, setData] = useState<RetentionResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [availableEvents, setAvailableEvents] = useState<EventNameItem[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
 
-  const debouncedCohort = useDebounce(cohort, 500);
+  // Load available event names on mount
+  useEffect(() => {
+    api.getEventNames()
+      .then((events) => {
+        setAvailableEvents(events);
+        // Auto-select first event if none selected
+        if (!cohort && events.length > 0) {
+          setCohort(events[0].name);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setEventsLoading(false));
+  }, []);
 
   useEffect(() => {
-    if (!debouncedCohort.trim() || day < 1) {
+    if (!cohort.trim() || day < 1) {
       setData(null);
       return;
     }
@@ -28,12 +41,12 @@ export default function RetentionPage() {
     setLoading(true);
     setError(null);
     api
-      .getRetentionAnalysis(debouncedCohort.trim(), day, from, to)
+      .getRetentionAnalysis(cohort.trim(), day, from, to)
       .then((res) => { if (!cancelled) setData(res); })
       .catch((err) => { if (!cancelled) setError(err?.message || 'Failed to load'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [debouncedCohort, day, from, to]);
+  }, [cohort, day, from, to]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -43,7 +56,22 @@ export default function RetentionPage() {
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[180px]">
           <label className="text-sm text-muted-foreground">Cohort Event</label>
-          <Input value={cohort} onChange={(e) => setCohort(e.target.value)} className="mt-1" />
+          {eventsLoading ? (
+            <div className="mt-1 h-10 rounded-md bg-secondary animate-pulse" />
+          ) : (
+            <select
+              value={cohort}
+              onChange={(e) => setCohort(e.target.value)}
+              className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Select an event...</option>
+              {availableEvents.map((evt) => (
+                <option key={evt.name} value={evt.name}>
+                  {evt.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="w-28">
           <label className="text-sm text-muted-foreground">Day</label>
@@ -51,7 +79,24 @@ export default function RetentionPage() {
         </div>
       </div>
 
-      {loading && <div className="text-muted-foreground">Loading…</div>}
+      {/* Quick day presets */}
+      <div className="flex gap-2">
+        {[1, 3, 7, 14, 30].map((d) => (
+          <button
+            key={d}
+            onClick={() => setDay(d)}
+            className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+              day === d
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Day {d}
+          </button>
+        ))}
+      </div>
+
+      {loading && <div className="text-muted-foreground">Loading...</div>}
       {error && <div className="text-destructive text-sm">{error}</div>}
 
       {data && !loading && (

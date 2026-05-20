@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-/** Mark route as dynamic so Next.js does not try to statically analyze request.cookies at build time */
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
@@ -11,7 +10,7 @@ export async function GET(request: NextRequest) {
     if (!token) {
       return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
     }
-    const response = await fetch(`${API_URL}/dashboard/analytics/attribution`, {
+    const response = await fetch(`${API_URL}/dashboard/analytics/event-names`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       cache: 'no-store',
@@ -19,7 +18,7 @@ export async function GET(request: NextRequest) {
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error: unknown) {
-    console.error('Attribution proxy error:', error);
-    return NextResponse.json({ success: false, error: 'Failed to fetch attribution data' }, { status: 500 });
+    console.error('Event names proxy error:', error);
+    return NextResponse.json({ success: false, error: 'Failed to fetch event names' }, { status: 500 });
   }
 }

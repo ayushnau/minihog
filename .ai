@@ -1,0 +1,352 @@
+# MiniHog - Self-hosted Product Analytics & Attribution Engine
+
+## Related Documents
+- **[DESIGN.md](.claude/DESIGN.md)** — Full UI/UX specification: every page, feature, component, state, chart, and design freedom note. Use this when implementing the UI redesign from Claude Design assets.
+
+## What is this project?
+
+MiniHog is a PostHog-inspired, self-hosted analytics platform. It tracks user events, analyzes funnels/retention, and performs last-click campaign attribution. It's a Turborepo monorepo with 3 packages.
+
+## Monorepo Structure
+
+```
+minihog/
+├── packages/
+│   ├── sdk/          # npm: minihog-sdk - Client-side JS/TS event tracking SDK
+│   ├── api/          # @minihog/api - Express backend (event ingestion + analytics)
+│   └── dashboard/    # @minihog/dashboard - Next.js 14 frontend (auth, dashboard, settings)
+├── turbo.json        # Turborepo config
+└── package.json      # Root workspace (npm workspaces)
+```
+
+## Quick Reference - Dev Commands
+
+```bash
+npm run dev           # Start all packages (API :3000, Dashboard :3002)
+npm run build         # Build all packages via Turbo
+
+# Database
+cd packages/api && npx prisma db push       # Sync API schema to DB
+cd packages/api && npx prisma studio        # Open DB GUI
+cd packages/api && npx prisma generate      # Regenerate Prisma client
+cd packages/dashboard && npx prisma db push # Sync dashboard schema
+
+# SDK
+cd packages/sdk && npm run build            # Build SDK (tsc → dist/)
+```
+
+## Environment Variables
+
+Both packages share the same database and JWT secret.
+
+### packages/api/.env
+```
+DATABASE_URL="postgresql://user:pass@localhost:5432/minihog"
+PORT=3000
+NODE_ENV=development
+JWT_SECRET=<shared-secret>
+ATTRIBUTION_WINDOW_HOURS=24
+CORS_ORIGIN=http://localhost:3002
+```
+
+### packages/dashboard/.env.local (runtime) + .env (Prisma CLI)
+```
+DATABASE_URL="postgresql://user:pass@localhost:5432/minihog"
+JWT_SECRET=<same-shared-secret>
+NEXT_PUBLIC_API_URL=http://localhost:3000
+```
+
+**Critical:** JWT_SECRET must be identical in both packages. DATABASE_URL must point to the same database.
+
+---
+
+## Package 1: SDK (`packages/sdk/`)
+
+### Purpose
+Zero-dependency JS/TS SDK for client-side event tracking. Published on npm as `minihog-sdk`.
+
+### Architecture
+```
+track() → Queue (in-memory array) → batch when size>=10 or every 5s → Transport → POST /track or /track/batch
+                                                                          ↓
+                                                                    Retry (exponential backoff: 1s→2s→4s, max 3)
+```
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `src/index.ts` | Main MiniHog class - init(), track(), flush(), singleton export |
+| `src/queue.ts` | In-memory event buffer - add(), flush(), clear() |
+| `src/transport.ts` | HTTP layer using fetch - sends events with X-API-Key header |
+| `src/retry.ts` | Exponential backoff retry wrapper (baseDelay * 2^attempt) |
+| `src/session.ts` | Distinct ID generation & localStorage persistence |
+
+### Config Options (passed to init())
+| Option | Default | Description |
+|--------|---------|-------------|
+| apiKey | - | API key from dashboard (sent as X-API-Key header) |
+| environment | 'production' | 'production' / 'sandbox' / 'development' |
+| batchSize | 10 | Events buffered before auto-flush |
+| flushInterval | 5000 | Auto-flush timer in ms |
+| enableRetry | true | Enable exponential backoff retry |
+| maxRetries | 3 | Max retry attempts per send |
+
+### Endpoint Mapping
+| Environment | URL |
+|-------------|-----|
+| production | https://backendapiserver.vercel.app |
+| sandbox | https://backendapiserver.vercel.app |
+| development | http://localhost:3000 |
+
+### Auto-flush Triggers
+1. Queue reaches batchSize (immediate)
+2. flushInterval timer fires (periodic)
+3. `beforeunload` event (page navigation)
+
+### Limitations
+- Queue is in-memory only — events lost on page refresh or if all retries fail
+- No offline persistence (no localStorage/IndexedDB queue)
+- No deduplication on client side (server has event_id support)
+
+---
+
+## Package 2: API (`packages/api/`)
+
+### Purpose
+Express.js backend for event ingestion, analytics queries, and attribution.
+
+### Architecture
+```
+SDK → POST /track[/batch] (API key auth) → Prisma → PostgreSQL (direct write, no server queue)
+Dashboard → GET /dashboard/analytics/* (JWT auth) → Analytics services → Prisma → PostgreSQL
+```
+
+### Key Files
+
+#### Entry Points
+| File | Purpose |
+|------|---------|
+| `src/index.ts` | Express app setup, CORS, routes, error handler |
+| `api/index.ts` | Vercel serverless wrapper (lazy-loads Express, 25s timeout) |
+
+#### Routes
+| File | Endpoints | Auth |
+|------|-----------|------|
+| `src/routes/track.ts` | POST /track, POST /track/batch | API Key |
+| `src/routes/click.ts` | POST /click | None |
+| `src/routes/install.ts` | POST /install | None |
+| `src/routes/analytics.ts` | GET /analytics/{events,funnel,retention,attribution} | None |
+| `src/routes/dashboardAnalytics.ts` | GET /dashboard/analytics/{events,funnel,retention,attribution} | JWT |
+
+#### Middleware
+| File | Purpose |
+|------|---------|
+| `src/middleware/apiKeyAuth.ts` | Validates API key (X-API-Key header, Bearer token, or ?api_key query). Updates lastUsed. Checks soft-delete. |
+| `src/middleware/jwtAuth.ts` | Validates JWT from Authorization header or auth-token cookie. Attaches userId + apiKeyIds to request. |
+| `src/middleware/errorHandler.ts` | Global error handler - Prisma errors, Zod validation, auth errors, 404s. |
+
+#### Analytics Services (`src/services/analytics/`)
+| File | Function | Description |
+|------|----------|-------------|
+| `eventCount.ts` | getEventCounts() | Total count + unique users for an event |
+| `timeSeries.ts` | getEventTimeSeries() | Daily/hourly event counts over time |
+| `funnel.ts` | getFunnelAnalysis() | Multi-step conversion with drop-off % |
+| `retention.ts` | getRetentionAnalysis() | N-day cohort retention |
+| `propertiesBreakdown.ts` | getEventPropertiesBreakdown() | Top 20 values for a property key |
+| `propertiesBreakdown.ts` | getAvailablePropertyKeys() | Samples 1000 events for property keys |
+| `userJourney.ts` | getUserJourneys() | Per-user event sequences (top 50) |
+| `userJourney.ts` | getCommonUserPaths() | Aggregated event path frequencies |
+| `queryHelper.ts` | executeWithUserIdFallback() | Graceful fallback from userId to apiKeyIds filtering |
+
+#### Other Services
+| File | Function | Description |
+|------|----------|-------------|
+| `src/services/attribution.ts` | performAttribution() | Last-click attribution: finds most recent click within window |
+| `src/db/client.ts` | prisma (singleton) | Prisma client with connection pooling, dev query logging |
+
+### Database Schema (`prisma/schema.prisma`)
+
+#### Tables
+| Table | Key Columns | Purpose |
+|-------|-------------|---------|
+| events | event_name, distinct_id, timestamp, properties (JSON), user_id, api_key_id | All tracked events |
+| clicks | device_id, campaign_id, timestamp | Marketing click attribution data |
+| installs | device_id, install_time, attributed_campaign_id | Install events with attribution result |
+| users | username, email, password_hash | Dashboard user accounts |
+| api_keys | user_id, key, name, deleted_at | API keys with soft delete |
+
+#### Key Indexes
+- events: (event_name, timestamp), (user_id, event_name, timestamp), (api_key_id, event_name, timestamp), distinct_id
+- clicks: (device_id, timestamp), campaign_id
+- installs: device_id, attributed_campaign_id, install_time
+- api_keys: user_id, key, deleted_at
+
+### Event Ingestion Details
+- **Single event:** POST /track → Prisma create()
+- **Batch:** POST /track/batch → Prisma $transaction() with Promise.all (max 1000 events, 30s timeout)
+- **Idempotency:** Optional event_id field for deduplication
+- **No server-side queue** — direct DB writes
+
+### Attribution Flow
+```
+POST /click { device_id, campaign_id } → clicks table
+POST /install { device_id } → performAttribution() → find latest click within ATTRIBUTION_WINDOW_HOURS
+                             → store in installs table + create event with attributed_campaign_id
+```
+
+---
+
+## Package 3: Dashboard (`packages/dashboard/`)
+
+### Purpose
+Next.js 14 frontend with auth, API key management, and analytics visualization.
+
+### Architecture
+```
+React Pages → api client (Axios) → Next.js API routes (/api/analytics/*) → proxy to Express API
+                                  → Next.js API routes (/api/auth/*, /api/keys) → direct Prisma calls
+```
+
+### Key Files
+
+#### App Pages
+| File | Route | Purpose |
+|------|-------|---------|
+| `app/page.tsx` | / | Landing page with features + quick start |
+| `app/signin/page.tsx` | /signin | Login / Register form |
+| `app/(dashboard)/dashboard/page.tsx` | /dashboard | Overview KPIs for common events |
+| `app/(dashboard)/events/page.tsx` | /events | Event search, time series, properties, journeys |
+| `app/(dashboard)/funnel/page.tsx` | /funnel | Multi-step funnel analysis |
+| `app/(dashboard)/retention/page.tsx` | /retention | Cohort retention metrics |
+| `app/(dashboard)/attribution/page.tsx` | /attribution | Campaign attribution pie charts |
+| `app/(dashboard)/keys/page.tsx` | /keys | Generate, view, revoke API keys |
+| `app/(dashboard)/settings/page.tsx` | /settings | Profile, theme, date range preferences |
+
+#### API Routes
+| File | Method | Purpose |
+|------|--------|---------|
+| `app/api/auth/register/route.ts` | POST | Create user (bcrypt hash, validation) |
+| `app/api/auth/login/route.ts` | POST | Authenticate, issue JWT cookie (30-day) |
+| `app/api/auth/logout/route.ts` | POST | Clear auth-token cookie |
+| `app/api/auth/me/route.ts` | GET | Get current user from JWT cookie |
+| `app/api/auth/profile/route.ts` | PATCH | Update email |
+| `app/api/auth/change-password/route.ts` | POST | Change password (verifies current) |
+| `app/api/keys/route.ts` | GET/POST/DELETE | List, generate, revoke API keys |
+| `app/api/analytics/events/route.ts` | GET | Proxy → backend /dashboard/analytics/events |
+| `app/api/analytics/funnel/route.ts` | GET | Proxy → backend /dashboard/analytics/funnel |
+| `app/api/analytics/retention/route.ts` | GET | Proxy → backend /dashboard/analytics/retention |
+| `app/api/analytics/attribution/route.ts` | GET | Proxy → backend /dashboard/analytics/attribution |
+
+#### Libraries (`src/lib/`)
+| File | Purpose |
+|------|---------|
+| `api.ts` | Axios client with typed methods: getEventCounts, getFunnelAnalysis, getRetentionAnalysis, getAttributionAnalytics |
+| `auth.ts` | Server-side auth: register, login, API key CRUD (bcrypt + Prisma) |
+| `db.ts` | Prisma singleton client |
+| `useAuth.ts` | React hook: user state, loading, logout, refresh |
+| `useDebounce.ts` | Generic debounce hook (default 500ms) |
+| `settings.ts` | localStorage-based date range preference |
+| `errorHandler.ts` | Axios error → user-friendly message mapping |
+| `utils.ts` | cn() - Tailwind class merge utility |
+
+#### Components (`src/components/`)
+| File | Purpose |
+|------|---------|
+| `AuthGuard.tsx` | Redirects to /signin if not authenticated |
+| `DashboardLayout.tsx` | Sidebar + main content wrapper |
+| `AppNavigation.tsx` | Desktop sidebar + mobile hamburger menu (7 nav links) |
+| `DateRangePicker.tsx` | Date range inputs with 7d/30d/90d quick buttons |
+| `KpiCard.tsx` | Metric card with optional trend indicator |
+| `ui/*` | 40+ shadcn/ui components (Radix UI + Tailwind) |
+
+### Auth Flow
+```
+/signin form → POST /api/auth/register or /api/auth/login
+             → bcrypt verify → SignJWT (30-day) → Set auth-token cookie (httpOnly)
+             → redirect to /dashboard
+
+Protected pages: AuthGuard → useAuth() → GET /api/auth/me → verify JWT → fetch user
+```
+
+### Dashboard Analytics Flow
+```
+Dashboard page → api.getEventCounts() → GET /api/analytics/events (with cookie)
+               → Next.js route extracts JWT → forwards to Express API with Authorization header
+               → Express validateJWT → analytics service → Prisma query → response
+```
+
+### Tech Stack
+- Next.js 14 (App Router), React 18, TypeScript
+- Tailwind CSS + shadcn/ui (Radix primitives)
+- Recharts (LineChart, BarChart, PieChart)
+- Axios (HTTP client with interceptors)
+- jose (JWT), bcryptjs (password hashing)
+- Prisma (shared schema with API)
+
+---
+
+## Data Flow Summary
+
+### Event Tracking (SDK → DB)
+```
+Browser/App
+  → miniHog.track('event', props)
+  → SDK Queue (in-memory, batches of 10)
+  → POST /track/batch with X-API-Key header
+  → API validates key, extracts userId
+  → Prisma $transaction → INSERT into events table
+```
+
+### Analytics (DB → Dashboard)
+```
+Dashboard page
+  → Axios GET /api/analytics/events?event=signup&from=...&to=...
+  → Next.js API route (JWT from cookie)
+  → Proxy to Express: GET /dashboard/analytics/events (Authorization: Bearer <jwt>)
+  → validateJWT middleware (extracts userId, apiKeyIds)
+  → Promise.all([eventCounts, timeSeries, properties, journeys])
+  → Prisma queries with userId filter
+  → JSON response → Recharts visualization
+```
+
+### Attribution (Click → Install → Campaign)
+```
+Ad click → POST /click { device_id, campaign_id } → clicks table
+App install → POST /install { device_id }
+           → performAttribution(): find latest click within 24h window
+           → installs table (with attributed_campaign_id)
+           → events table (install event)
+```
+
+---
+
+## Deployment
+
+### Vercel (Production)
+- **API:** Serverless function at `api/index.ts` (lazy-loads Express, 25s timeout)
+- **Dashboard:** Next.js app with automatic API route deployment
+- **Database:** Supabase PostgreSQL (use connection pooler URL, port 6543)
+
+### Local Development
+```bash
+# Prerequisites: Node 18+, PostgreSQL running locally
+npm install
+createdb minihog
+cd packages/api && npx prisma db push && cd ../..
+cd packages/dashboard && npx prisma db push && cd ../..
+npm run dev
+# API at http://localhost:3000, Dashboard at http://localhost:3002
+```
+
+---
+
+## Conventions
+
+- **Event names:** snake_case (install, signup, page_view, button_click)
+- **DB columns:** snake_case (event_name, distinct_id) via Prisma @map()
+- **TypeScript:** camelCase for code
+- **API responses:** JSON with snake_case keys
+- **Auth:** JWT in httpOnly cookie (auth-token), API key in X-API-Key header
+- **Soft deletes:** API keys use deletedAt column, never hard-deleted
+- **Error handling:** Zod validation on inputs, global error middleware, graceful userId→apiKeyIds fallback
+- **Analytics filtering:** Primary by userId, fallback to apiKeyIds array for backward compatibility

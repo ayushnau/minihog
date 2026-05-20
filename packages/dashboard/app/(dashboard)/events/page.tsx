@@ -4,11 +4,10 @@ import { useState, useEffect } from 'react';
 import DateRangePicker from '@/components/DateRangePicker';
 import KpiCard from '@/components/KpiCard';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { api, EventCountResponse } from '@/lib/api';
-import { useDebounce } from '@/lib/useDebounce';
+import { api, EventCountResponse, EventNameItem } from '@/lib/api';
 import { getDefaultDateRange } from '@/lib/settings';
 import { format, subDays } from 'date-fns';
+import { RefreshCw } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell,
@@ -25,6 +24,9 @@ export default function EventsPage() {
   const [data, setData] = useState<EventCountResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [availableEvents, setAvailableEvents] = useState<EventNameItem[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const d = Number(getDefaultDateRange()) || 7;
@@ -32,10 +34,17 @@ export default function EventsPage() {
     setTo(format(new Date(), 'yyyy-MM-dd'));
   }, []);
 
-  const debouncedEvent = useDebounce(eventName.trim(), 500);
-
+  // Load available event names
   useEffect(() => {
-    if (!debouncedEvent) {
+    api.getEventNames()
+      .then(setAvailableEvents)
+      .catch(() => {})
+      .finally(() => setEventsLoading(false));
+  }, []);
+
+  // Load event data when selection changes
+  useEffect(() => {
+    if (!eventName) {
       setData(null);
       setError(null);
       return;
@@ -44,46 +53,69 @@ export default function EventsPage() {
     setLoading(true);
     setError(null);
     api
-      .getEventCounts(debouncedEvent, from, to, {
+      .getEventCounts(eventName, from, to, {
         includeTimeSeries: true,
         includeProperties: true,
         includeJourneys: true,
         propertyKey,
         granularity,
       })
-      .then((res) => {
-        if (!cancelled) setData(res);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err?.message || 'Failed to load');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .then((res) => { if (!cancelled) setData(res); })
+      .catch((err) => { if (!cancelled) setError(err?.message || 'Failed to load'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [debouncedEvent, from, to, propertyKey, granularity]);
+  }, [eventName, from, to, propertyKey, granularity, refreshKey]);
+
+  // Format property display for journey events
+  const formatProps = (properties: Record<string, unknown> | undefined) => {
+    if (!properties) return null;
+    const entries = Object.entries(properties).filter(([_, v]) => v != null);
+    if (entries.length === 0) return null;
+    return entries.map(([k, v]) => (
+      <span key={k} className="text-muted-foreground text-[10px] ml-1">
+        {k}:<span className="text-foreground/70">{String(v)}</span>
+      </span>
+    ));
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <h1 className="text-2xl font-bold">Event Analytics</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Event Analytics</h1>
+        {eventName && (
+          <Button variant="outline" size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
+        )}
+      </div>
       <DateRangePicker onDateChange={(f, t) => { setFrom(f); setTo(t); }} defaultDays={Number(getDefaultDateRange()) || 7} />
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[200px]">
           <label className="text-sm text-muted-foreground">Event name</label>
-          <Input
-            value={eventName}
-            onChange={(e) => setEventName(e.target.value)}
-            placeholder="e.g. button_click, signup"
-            className="mt-1"
-          />
+          {eventsLoading ? (
+            <div className="mt-1 h-10 rounded-md bg-secondary animate-pulse" />
+          ) : (
+            <select
+              value={eventName}
+              onChange={(e) => setEventName(e.target.value)}
+              className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="">Select an event...</option>
+              {availableEvents.map((evt) => (
+                <option key={evt.name} value={evt.name}>
+                  {evt.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <div>
           <label className="text-sm text-muted-foreground">Granularity</label>
           <select
             value={granularity}
             onChange={(e) => setGranularity(e.target.value as 'day' | 'hour')}
-            className="mt-1 h-9 px-3 rounded-md bg-secondary text-secondary-foreground border border-border text-sm block"
+            className="mt-1 h-10 px-3 rounded-md bg-secondary text-secondary-foreground border border-border text-sm block"
           >
             <option value="day">Daily</option>
             <option value="hour">Hourly</option>
@@ -91,7 +123,7 @@ export default function EventsPage() {
         </div>
       </div>
 
-      {loading && <div className="text-muted-foreground text-sm">Loading…</div>}
+      {loading && <div className="text-muted-foreground text-sm">Loading...</div>}
       {error && <div className="text-destructive text-sm">{error}</div>}
 
       {data && !loading && (
@@ -185,14 +217,14 @@ export default function EventsPage() {
                 {data.user_journeys.slice(0, 10).map((j) => (
                   <div key={j.user_id} className="p-3 rounded-md bg-secondary">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-mono text-xs text-primary">{j.user_id.slice(0, 12)}…</span>
+                      <span className="font-mono text-xs text-primary">{j.user_id.slice(0, 16)}...</span>
                       <span className="text-xs text-muted-foreground">{j.total_events} events</span>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1.5">
                       {j.events.map((ev, i) => (
-                        <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-primary/10 text-primary font-mono">
+                        <span key={i} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-xs bg-primary/10 text-primary font-mono">
                           {ev.event_name}
-                          {ev.properties?.page != null && <span className="text-muted-foreground">({String(ev.properties.page)})</span>}
+                          {formatProps(ev.properties)}
                         </span>
                       ))}
                     </div>
@@ -216,7 +248,7 @@ export default function EventsPage() {
                       {p.path.map((step, i) => (
                         <span key={i} className="flex items-center gap-1">
                           <span className="px-2 py-0.5 rounded text-xs bg-accent/10 text-accent font-mono">{step}</span>
-                          {i < p.path.length - 1 && <span className="text-muted-foreground">→</span>}
+                          {i < p.path.length - 1 && <span className="text-muted-foreground">-&gt;</span>}
                         </span>
                       ))}
                     </div>
@@ -228,9 +260,9 @@ export default function EventsPage() {
         </>
       )}
 
-      {!eventName.trim() && (
+      {!eventName && (
         <div className="text-center py-20 text-muted-foreground">
-          <p>Enter an event name to view analytics (data loads automatically).</p>
+          <p>Select an event to view analytics.</p>
         </div>
       )}
     </div>

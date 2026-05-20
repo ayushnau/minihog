@@ -1,0 +1,1 @@
+/Users/ayushnautiyal/Personal/minihog/.ai

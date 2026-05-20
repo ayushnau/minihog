@@ -104,12 +104,12 @@ export async function getFunnelAnalysis(
   }> = [];
 
   // For each subsequent step, find users who completed all previous steps
-  let previousStepUsers = new Map<string, Date>(); // distinctId -> last timestamp of previous step
+  let previousStepUsers = new Map<string, Date>(); // distinctId -> earliest timestamp of this step
 
-  // Initialize with first step
+  // Initialize with first step — use earliest occurrence so subsequent steps have the widest window
   firstStepUsers.forEach(event => {
     const existing = previousStepUsers.get(event.distinctId);
-    if (!existing || event.timestamp > existing) {
+    if (!existing || event.timestamp < existing) {
       previousStepUsers.set(event.distinctId, event.timestamp);
     }
   });
@@ -173,11 +173,12 @@ export async function getFunnelAnalysis(
 
     // Filter: user must have completed previous step AND current step
     // Current step must occur after previous step
+    // Use earliest qualifying occurrence so later steps have the widest window
     currentStepEvents.forEach(event => {
       const previousTimestamp = previousStepUsers.get(event.distinctId);
       if (previousTimestamp && event.timestamp >= previousTimestamp) {
         const existing = currentStepUsers.get(event.distinctId);
-        if (!existing || event.timestamp > existing) {
+        if (!existing || event.timestamp < existing) {
           currentStepUsers.set(event.distinctId, event.timestamp);
         }
       }

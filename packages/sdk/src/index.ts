@@ -100,6 +100,19 @@ class MiniHog {
   }
 
   /**
+   * Identify a user with a custom ID from the merchant's auth system.
+   * After calling identify(), all subsequent events will use this ID as distinct_id,
+   * making funnel and retention analysis work across sessions/devices.
+   */
+  identify(userId: string): void {
+    if (!userId || typeof userId !== 'string') {
+      console.warn('MiniHog: identify() requires a non-empty string userId.');
+      return;
+    }
+    this.session.identify(userId);
+  }
+
+  /**
    * Track an event
    */
   track(eventName: string, properties?: EventProperties): void {

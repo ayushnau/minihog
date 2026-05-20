@@ -110,6 +110,41 @@ router.get('/events', async (req: Request, res: Response, next: NextFunction) =>
 });
 
 /**
+ * GET /dashboard/analytics/event-names
+ * Returns all distinct event names for the authenticated user
+ */
+router.get('/event-names', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const apiKeyIds = (req as any).apiKeyIds || [];
+    const requestUserId = (req as any).userId;
+
+    const whereClause: any = {};
+    if (requestUserId) {
+      whereClause.userId = requestUserId;
+    } else if (apiKeyIds.length > 0) {
+      whereClause.apiKeyId = { in: apiKeyIds };
+    }
+
+    const events = await prisma.event.groupBy({
+      by: ['eventName'],
+      where: whereClause,
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+    });
+
+    res.json({
+      success: true,
+      event_names: events.map((e) => ({
+        name: e.eventName,
+        count: e._count.id,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * GET /dashboard/analytics/funnel
  * Returns funnel analysis for a sequence of events
  * Filtered by the authenticated user's API keys

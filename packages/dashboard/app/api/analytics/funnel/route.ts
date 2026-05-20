@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      cache: 'no-store',
     });
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });

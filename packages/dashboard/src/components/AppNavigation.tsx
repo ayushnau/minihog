@@ -9,7 +9,7 @@ import {
   Activity,
   Filter,
   Users,
-  Target,
+  // Target,
   Key,
   Settings,
   LogOut,
@@ -23,7 +23,7 @@ const navLinks = [
   { to: '/events', label: 'Events', icon: Activity },
   { to: '/funnel', label: 'Funnel', icon: Filter },
   { to: '/retention', label: 'Retention', icon: Users },
-  { to: '/attribution', label: 'Attribution', icon: Target },
+  // { to: '/attribution', label: 'Attribution', icon: Target }, // TODO: Attribution not yet implemented in SDK
   { to: '/keys', label: 'API Keys', icon: Key },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
