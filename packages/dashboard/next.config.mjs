@@ -7,9 +7,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: [],
-  // In npm workspaces, Next.js is hoisted to the repo root node_modules/.
-  // This tells @vercel/nft (used by @netlify/plugin-nextjs) to trace files
-  // from the monorepo root so it can find next/dist/** at runtime.
+  // Standalone mode: Next.js traces and copies ALL dependencies (including
+  // next/dist/**) into .next/standalone/. In a monorepo where next is hoisted
+  // to the repo root, the plugin's own nft tracer can't find it — standalone
+  // bypasses that by letting Next.js bundle everything itself.
+  output: 'standalone',
+  // Tell Next.js's file tracer to look from the repo root so it finds
+  // next/dist/** in ../../node_modules/ (npm workspaces hoisting).
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../../'),
   },
