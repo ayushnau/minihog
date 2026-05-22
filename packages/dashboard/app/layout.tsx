@@ -1,26 +1,29 @@
 import type { Metadata } from 'next';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { Toaster } from '@/components/ui/toaster';
-import { Toaster as Sonner } from '@/components/ui/sonner';
-import { ThemeProvider } from 'next-themes';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'MiniHog Dashboard',
-  description: 'Analytics dashboard for MiniHog',
+  description: 'Self-hosted product analytics — events, funnels, retention, attribution.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-          <TooltipProvider>
-            {children}
-            <Toaster />
-            <Sonner />
-          </TooltipProvider>
-        </ThemeProvider>
+      <head>
+        {/* Restore theme/accent before first paint to avoid flash */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            try {
+              var t = localStorage.getItem('mh-theme');
+              var a = localStorage.getItem('mh-accent');
+              if (t === 'light') document.documentElement.setAttribute('data-theme','light');
+              if (a) document.documentElement.setAttribute('data-accent', a);
+            } catch(e){}
+          })();
+        ` }} />
+      </head>
+      <body suppressHydrationWarning>
+        {children}
       </body>
     </html>
   );

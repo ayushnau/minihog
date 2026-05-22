@@ -1,16 +1,18 @@
 'use client';
-
-import AppNavigation from '@/components/AppNavigation';
+import AppNavigation from './AppNavigation';
+import AuthGuard from './AuthGuard';
+import AiWidget from './AiWidget';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen">
-      <AppNavigation />
-      <main className="md:ml-60 pt-14 md:pt-0 min-h-screen">
-        <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
+    <AuthGuard>
+      <div className="mh-app crt">
+        <AppNavigation />
+        <main>
           {children}
-        </div>
-      </main>
-    </div>
+        </main>
+        <AiWidget />
+      </div>
+    </AuthGuard>
   );
 }

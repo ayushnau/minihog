@@ -7,6 +7,8 @@ import { clickRouter } from './routes/click';
 import { installRouter } from './routes/install';
 import { analyticsRouter } from './routes/analytics';
 import { dashboardAnalyticsRouter } from './routes/dashboardAnalytics';
+import { aiRouter } from './routes/ai';
+import { eventSchemaRouter } from './routes/eventSchema';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 dotenv.config();
@@ -64,6 +66,8 @@ app.use('/click', clickRouter);
 app.use('/install', installRouter);
 app.use('/analytics', analyticsRouter);
 app.use('/dashboard/analytics', dashboardAnalyticsRouter);
+app.use('/ai', aiRouter);
+app.use('/event-schema', eventSchemaRouter);
 
 // 404 handler for undefined routes
 app.use(notFoundHandler);

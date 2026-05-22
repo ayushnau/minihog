@@ -1,68 +1,42 @@
+'use client';
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 
-interface DateRangePickerProps {
-  onDateChange: (from: string, to: string) => void;
-  defaultDays?: number;
-}
+interface DateRange { from: string; to: string; preset?: string; }
+interface Props { onDateChange: (range: DateRange) => void; defaultDays?: number; }
 
-const DateRangePicker: React.FC<DateRangePickerProps> = ({ onDateChange, defaultDays = 7 }) => {
-  const now = new Date();
-  const defaultFrom = new Date(now);
-  defaultFrom.setDate(defaultFrom.getDate() - defaultDays);
+function fmt(d: Date) { return d.toISOString().slice(0, 10); }
 
-  const [from, setFrom] = useState(defaultFrom.toISOString().split('T')[0]);
-  const [to, setTo] = useState(now.toISOString().split('T')[0]);
-  const [activeDays, setActiveDays] = useState<number | null>(defaultDays);
+export default function DateRangePicker({ onDateChange, defaultDays = 7 }: Props) {
+  const today = new Date();
+  const presetMap: Record<string, number> = { '7d': 7, '30d': 30, '90d': 90 };
+  const defaultPreset = defaultDays === 30 ? '30d' : defaultDays === 90 ? '90d' : '7d';
 
-  const setQuick = (days: number) => {
-    const t = new Date();
-    const f = new Date(t);
-    f.setDate(f.getDate() - days);
-    const fStr = f.toISOString().split('T')[0];
-    const tStr = t.toISOString().split('T')[0];
-    setFrom(fStr);
-    setTo(tStr);
-    setActiveDays(days);
-    onDateChange(fStr, tStr);
-  };
+  const [from, setFrom] = useState(fmt(new Date(today.getTime() - defaultDays * 86400000)));
+  const [to,   setTo]   = useState(fmt(today));
+  const [preset, setPreset] = useState(defaultPreset);
 
-  const handleManualChange = (newFrom: string, newTo: string) => {
-    setFrom(newFrom);
-    setTo(newTo);
-    setActiveDays(null); // Clear quick button highlight on manual change
+  const applyPreset = (p: string) => {
+    const d = presetMap[p];
+    const f = fmt(new Date(today.getTime() - d * 86400000));
+    const t = fmt(today);
+    setFrom(f); setTo(t); setPreset(p);
+    onDateChange({ from: f, to: t, preset: p });
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <input
-        type="date"
-        value={from}
-        onChange={e => handleManualChange(e.target.value, to)}
-        className="h-9 px-3 rounded-md bg-secondary text-secondary-foreground border border-border text-sm"
-      />
-      <span className="text-muted-foreground text-sm">to</span>
-      <input
-        type="date"
-        value={to}
-        onChange={e => handleManualChange(from, e.target.value)}
-        className="h-9 px-3 rounded-md bg-secondary text-secondary-foreground border border-border text-sm"
-      />
-      <Button size="sm" onClick={() => { setActiveDays(null); onDateChange(from, to); }}>Apply</Button>
-      <div className="flex gap-1">
-        {[7, 30, 90].map(d => (
-          <Button
-            key={d}
-            variant={activeDays === d ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setQuick(d)}
-          >
-            {d}d
-          </Button>
-        ))}
+    <div className="mh-row" style={{ gap: 6 }}>
+      <div className="mh-field" style={{ padding: '4px 8px' }}>
+        <span className="prompt">◷</span>
+        <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPreset(''); onDateChange({ from: e.target.value, to }); }} />
       </div>
+      <span className="mh-dim">→</span>
+      <div className="mh-field" style={{ padding: '4px 8px' }}>
+        <span className="prompt">◷</span>
+        <input type="date" value={to} onChange={e => { setTo(e.target.value); setPreset(''); onDateChange({ from, to: e.target.value }); }} />
+      </div>
+      {['7d','30d','90d'].map(p => (
+        <button key={p} className={`mh-btn sm ${preset === p ? 'primary' : 'ghost'}`} onClick={() => applyPreset(p)}>{p}</button>
+      ))}
     </div>
   );
-};
-
-export default DateRangePicker;
+}

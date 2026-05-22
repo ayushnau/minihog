@@ -15,7 +15,8 @@ export async function getEventPropertiesBreakdown(
   to: Date,
   propertyKey: string,
   apiKeyIds?: string[],
-  userId?: string
+  userId?: string,
+  propertyFilter?: { key: string; value: string }
 ): Promise<Array<{ value: string; count: number; unique_users: number }>> {
   // Build where clause
   const whereClause: any = {
@@ -25,6 +26,9 @@ export async function getEventPropertiesBreakdown(
       lte: to,
     },
   };
+  if (propertyFilter) {
+    whereClause.properties = { path: [propertyFilter.key], equals: propertyFilter.value };
+  }
 
   // Filter by userId (primary) OR apiKeyIds (fallback)
   // Handle missing userId column gracefully until migration is applied
@@ -62,6 +66,9 @@ export async function getEventPropertiesBreakdown(
         },
       };
       
+      if (propertyFilter) {
+        fallbackWhere.properties = { path: [propertyFilter.key], equals: propertyFilter.value };
+      }
       events = await prisma.event.findMany({
         where: fallbackWhere,
         select: {

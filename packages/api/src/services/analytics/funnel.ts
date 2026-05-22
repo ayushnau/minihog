@@ -1,179 +1,79 @@
 import { prisma } from '../../db/client';
 
-/**
- * Performs funnel analysis for a sequence of events
- * 
- * A funnel shows how many users progress through each step:
- * - Step 1: Users who completed event 1
- * - Step 2: Users who completed event 1 AND event 2 (in order)
- * - Step 3: Users who completed event 1, 2, AND 3 (in order)
- * 
- * Returns drop-off percentages between steps
- * @param apiKeyIds - Optional array of API key IDs to filter by (for user-specific data)
- * @param userId - Optional user ID to filter by (for data persistence after key revocation)
- */
+export interface FunnelStep {
+  event: string;
+  propertyKey?: string;
+  propertyValue?: string;
+}
+
 export async function getFunnelAnalysis(
-  steps: string[],
+  steps: FunnelStep[],
   from: Date,
   to: Date,
   apiKeyIds?: string[],
   userId?: string
 ): Promise<{
-  funnel: Array<{
-    step: number;
-    event_name: string;
-    users: number;
-    drop_off_percentage: number;
-  }>;
+  funnel: Array<{ step: number; event_name: string; property_filter?: string; users: number; drop_off_percentage: number }>;
   total_users_at_first_step: number;
 }> {
-  if (steps.length === 0) {
-    return {
-      funnel: [],
-      total_users_at_first_step: 0,
-    };
-  }
+  if (steps.length === 0) return { funnel: [], total_users_at_first_step: 0 };
 
-  // Build where clause with optional API key or user filter
-  const baseWhereClause: any = {
-    timestamp: {
-      gte: from,
-      lte: to,
-    },
-  };
-
-  // Filter by userId (primary) OR apiKeyIds (fallback)
-  // Handle missing userId column gracefully until migration is applied
+  const baseWhereClause: any = { timestamp: { gte: from, lte: to } };
   let useUserId = false;
   if (userId) {
     baseWhereClause.userId = userId;
     useUserId = true;
   } else if (apiKeyIds && apiKeyIds.length > 0) {
-    baseWhereClause.apiKeyId = {
-      in: apiKeyIds,
-    };
+    baseWhereClause.apiKeyId = { in: apiKeyIds };
   }
 
-  // Step 1: Get all users who completed the first event - handle missing userId column
-  let firstStepUsers: any[];
-  try {
-    firstStepUsers = await prisma.event.findMany({
-      where: {
-        eventName: steps[0],
-        ...baseWhereClause,
-      },
-      select: {
-        distinctId: true,
-        timestamp: true,
-      },
-    });
-  } catch (error: any) {
-    // If userId column doesn't exist, fall back to apiKeyIds filtering
-    if (error.code === 'P2022' && error.meta?.column?.includes('user_id') && useUserId && apiKeyIds && apiKeyIds.length > 0) {
-      const fallbackWhere: any = {
-        eventName: steps[0],
-        timestamp: {
-          gte: from,
-          lte: to,
-        },
-        apiKeyId: {
-          in: apiKeyIds,
-        },
-      };
-      
-      firstStepUsers = await prisma.event.findMany({
-        where: fallbackWhere,
-        select: {
-          distinctId: true,
-          timestamp: true,
-        },
-      });
-    } else {
+  const buildWhere = (step: FunnelStep, extra: any = {}) => {
+    const where: any = { eventName: step.event, ...baseWhereClause, ...extra };
+    if (step.propertyKey && step.propertyValue !== undefined && step.propertyValue !== '') {
+      where.properties = { path: [step.propertyKey], equals: step.propertyValue };
+    }
+    return where;
+  };
+
+  const queryStep = async (where: any): Promise<any[]> => {
+    try {
+      return await prisma.event.findMany({ where, select: { distinctId: true, timestamp: true } });
+    } catch (error: any) {
+      if (error.code === 'P2022' && error.meta?.column?.includes('user_id') && useUserId && apiKeyIds && apiKeyIds.length > 0) {
+        const fallback = { ...where };
+        delete fallback.userId;
+        fallback.apiKeyId = { in: apiKeyIds };
+        return await prisma.event.findMany({ where: fallback, select: { distinctId: true, timestamp: true } });
+      }
       throw error;
     }
-  }
+  };
 
-  const firstStepUserIds = new Set(firstStepUsers.map(e => e.distinctId));
-  const totalUsersAtFirstStep = firstStepUserIds.size;
-
-  const funnel: Array<{
-    step: number;
-    event_name: string;
-    users: number;
-    drop_off_percentage: number;
-  }> = [];
-
-  // For each subsequent step, find users who completed all previous steps
-  let previousStepUsers = new Map<string, Date>(); // distinctId -> earliest timestamp of this step
-
-  // Initialize with first step — use earliest occurrence so subsequent steps have the widest window
-  firstStepUsers.forEach(event => {
+  // Step 1
+  const firstStepEvents = await queryStep(buildWhere(steps[0]));
+  let previousStepUsers = new Map<string, Date>();
+  firstStepEvents.forEach(event => {
     const existing = previousStepUsers.get(event.distinctId);
     if (!existing || event.timestamp < existing) {
       previousStepUsers.set(event.distinctId, event.timestamp);
     }
   });
 
+  const funnel: Array<{ step: number; event_name: string; property_filter?: string; users: number; drop_off_percentage: number }> = [];
   funnel.push({
     step: 1,
-    event_name: steps[0],
+    event_name: steps[0].event,
+    property_filter: steps[0].propertyKey && steps[0].propertyValue ? `${steps[0].propertyKey}=${steps[0].propertyValue}` : undefined,
     users: previousStepUsers.size,
     drop_off_percentage: 0,
   });
 
-  // Process remaining steps
   for (let i = 1; i < steps.length; i++) {
     const currentStep = steps[i];
+    const extra = { distinctId: { in: Array.from(previousStepUsers.keys()) } };
+    const currentStepEvents = await queryStep(buildWhere(currentStep, extra));
+
     const currentStepUsers = new Map<string, Date>();
-
-    // Get all events for current step - handle missing userId column
-    let currentStepEvents: any[];
-    try {
-      currentStepEvents = await prisma.event.findMany({
-        where: {
-          eventName: currentStep,
-          distinctId: {
-            in: Array.from(previousStepUsers.keys()),
-          },
-          ...baseWhereClause,
-        },
-        select: {
-          distinctId: true,
-          timestamp: true,
-        },
-      });
-    } catch (error: any) {
-      // If userId column doesn't exist, fall back to apiKeyIds filtering
-      if (error.code === 'P2022' && error.meta?.column?.includes('user_id') && useUserId && apiKeyIds && apiKeyIds.length > 0) {
-        const fallbackWhere: any = {
-          eventName: currentStep,
-          distinctId: {
-            in: Array.from(previousStepUsers.keys()),
-          },
-          timestamp: {
-            gte: from,
-            lte: to,
-          },
-          apiKeyId: {
-            in: apiKeyIds,
-          },
-        };
-        
-        currentStepEvents = await prisma.event.findMany({
-          where: fallbackWhere,
-          select: {
-            distinctId: true,
-            timestamp: true,
-          },
-        });
-      } else {
-        throw error;
-      }
-    }
-
-    // Filter: user must have completed previous step AND current step
-    // Current step must occur after previous step
-    // Use earliest qualifying occurrence so later steps have the widest window
     currentStepEvents.forEach(event => {
       const previousTimestamp = previousStepUsers.get(event.distinctId);
       if (previousTimestamp && event.timestamp >= previousTimestamp) {
@@ -184,27 +84,20 @@ export async function getFunnelAnalysis(
       }
     });
 
-    const currentStepUserCount = currentStepUsers.size;
-    const previousStepUserCount = previousStepUsers.size;
-    const dropOffPercentage =
-      previousStepUserCount > 0
-        ? ((previousStepUserCount - currentStepUserCount) / previousStepUserCount) * 100
-        : 0;
+    const dropOff = previousStepUsers.size > 0
+      ? ((previousStepUsers.size - currentStepUsers.size) / previousStepUsers.size) * 100
+      : 0;
 
     funnel.push({
       step: i + 1,
-      event_name: currentStep,
-      users: currentStepUserCount,
-      drop_off_percentage: Math.round(dropOffPercentage * 100) / 100,
+      event_name: currentStep.event,
+      property_filter: currentStep.propertyKey && currentStep.propertyValue ? `${currentStep.propertyKey}=${currentStep.propertyValue}` : undefined,
+      users: currentStepUsers.size,
+      drop_off_percentage: Math.round(dropOff * 100) / 100,
     });
 
     previousStepUsers = currentStepUsers;
   }
 
-  return {
-    funnel,
-    total_users_at_first_step: totalUsersAtFirstStep,
-  };
+  return { funnel, total_users_at_first_step: previousStepUsers.size > 0 ? funnel[0].users : 0 };
 }
-
-

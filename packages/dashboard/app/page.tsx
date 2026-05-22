@@ -1,128 +1,111 @@
 'use client';
-
 import Link from 'next/link';
 import { useAuth } from '@/lib/useAuth';
-import { Flame, BarChart3, Activity, Zap, Code, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-
-const features = [
-  { icon: Activity, title: 'Event Tracking', desc: 'Track every user interaction with a simple SDK call. Page views, clicks, signups, purchases — all captured.' },
-  { icon: BarChart3, title: 'Real-time Analytics', desc: 'See your data update in real-time. Time series, funnels, retention — all at your fingertips.' },
-  { icon: Zap, title: 'Attribution', desc: 'Understand which campaigns drive installs and purchases with last-click attribution.' },
-  { icon: Code, title: 'Easy Integration', desc: 'Drop in our JavaScript SDK with a single init call. Track events in under 5 minutes.' },
-];
 
 export default function LandingPage() {
   const { user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-background">
-      <nav className="border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Flame className="h-6 w-6 text-primary" />
-            <span className="text-lg font-bold tracking-tight">MiniHog</span>
-          </div>
-          <div className="flex items-center gap-3">
-            {user ? (
-              <Link href="/dashboard">
-                <Button size="sm">Dashboard</Button>
-              </Link>
-            ) : (
-              <Link href="/signin">
-                <Button size="sm">Sign In</Button>
-              </Link>
-            )}
-          </div>
+    <div className="mh-landing">
+      <nav>
+        <Link href="/" className="brand" style={{ textDecoration: 'none' }}>
+          <span className="mark">▣</span>
+          <span style={{ letterSpacing: '.04em' }}>MINIHOG</span>
+          <span className="mh-dim" style={{ marginLeft: 8, fontSize: 11 }}>v1.0.0</span>
+        </Link>
+        <div className="links">
+          <button className="mh-btn ghost" onClick={() => {}}>docs</button>
+          {user ? (
+            <Link href="/dashboard" className="mh-btn primary">Open Dashboard →</Link>
+          ) : (
+            <>
+              <Link href="/signin" className="mh-btn ghost">Sign In</Link>
+              <Link href="/signin" className="mh-btn primary">Get Started →</Link>
+            </>
+          )}
         </div>
       </nav>
 
-      <section className="relative py-24 md:py-32 overflow-hidden">
-        <div className="absolute inset-0 gradient-hero" />
-        <div className="relative max-w-4xl mx-auto px-4 text-center animate-fade-in">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-secondary text-xs text-muted-foreground mb-6">
-            <Flame className="h-3 w-3 text-primary" />
-            Open-source product analytics
-          </div>
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4">
-            <span className="text-gradient">MiniHog</span> Analytics
+      <section className="mh-hero">
+        <div>
+          <div className="ko">product analytics · self-hosted · open core</div>
+          <h1>
+            Track your product<br/>
+            without<br/>
+            the<span style={{ color: 'var(--acc)' }}> bullsh*t</span><span className="blink" />
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-            Lightweight, self-hosted product analytics. Track events, analyze funnels, measure retention, and attribute campaigns — all in one dashboard.
+          <p className="lead">
+            MiniHog is the analytics console you'd actually run yourself. Events, funnels, retention, attribution — all the building blocks of a product team's dashboard, none of the dark patterns.
           </p>
-          <Link href="/signin">
-            <Button size="lg" className="gradient-primary border-0 text-primary-foreground glow-sm">
-              Get Started <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
-      </section>
-
-      <section className="py-20 border-t border-border">
-        <div className="max-w-6xl mx-auto px-4">
-          <h2 className="text-2xl font-bold text-center mb-12">Everything you need</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {features.map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="rounded-lg border border-border bg-card p-6 hover:border-primary/30 transition-colors animate-slide-up">
-                <Icon className="h-8 w-8 text-primary mb-4" />
-                <h3 className="font-semibold mb-2">{title}</h3>
-                <p className="text-sm text-muted-foreground">{desc}</p>
-              </div>
-            ))}
+          <div className="ctas">
+            <Link href="/signin" className="mh-btn primary lg">Create workspace →</Link>
+            <Link href={user ? '/dashboard' : '/signin'} className="mh-btn ghost lg">See a live demo</Link>
+          </div>
+          <div className="mh-row" style={{ marginTop: 24, gap: 22, fontSize: 11.5, color: 'var(--fg-3)' }}>
+            <span><span className="mh-acc">✓</span> open source (MIT)</span>
+            <span><span className="mh-acc">✓</span> self-host or cloud</span>
+            <span><span className="mh-acc">✓</span> SDK in 6 languages</span>
           </div>
         </div>
+
+        <div className="mh-terminal">
+          <div className="ttab">
+            <div className="dots"><span /><span /><span /></div>
+            <span style={{ marginLeft: 8 }}>~/minihog — cli</span>
+            <span style={{ marginLeft: 'auto', color: 'var(--acc)' }}>● live</span>
+          </div>
+          <pre>{'$ minihog status\n\n  workspace   minihog-prod    region us-east-1\n  events 24h  '}<span style={{ color: 'var(--acc)' }}>38,410</span>{'        p95 lag '}<span style={{ color: 'var(--acc)' }}>142 ms</span>{'\n  ingest      '}<span style={{ color: 'var(--info)' }}>▁▂▃▅▆▇█▇▆▅▆▇█▇▅▄▃▅▆▇</span>{'\n\n$ minihog funnel install→signup→purchase\n  install   '}<span style={{ color: 'var(--acc)' }}>████████████████</span>{' 8,120\n  signup    '}<span style={{ color: 'var(--acc)' }}>███████████</span>{'      5,842  '}<span style={{ color: 'var(--fg-3)' }}>(72%)</span>{'\n  purchase  '}<span style={{ color: 'var(--acc)' }}>██</span>{'               1,204  '}<span style={{ color: 'var(--fg-3)' }}>(15%)</span>{'\n\n$ _'}<span style={{ background: 'var(--acc)', width: '.55em', height: '1em', display: 'inline-block', verticalAlign: '-.12em' }} /></pre>
+        </div>
       </section>
 
-      <section className="py-20 border-t border-border">
-        <div className="max-w-4xl mx-auto px-4">
-          <h2 className="text-2xl font-bold text-center mb-12">Quick Start</h2>
-          <div className="space-y-6">
-            <div className="rounded-lg border border-border bg-card p-6">
-              <h3 className="font-semibold mb-3">1. Install the SDK</h3>
-              <pre className="bg-secondary rounded-md p-4 text-sm font-mono text-secondary-foreground overflow-x-auto">
-                npm install minihog-sdk
-              </pre>
-            </div>
-            <div className="rounded-lg border border-border bg-card p-6">
-              <h3 className="font-semibold mb-3">2. Initialize</h3>
-              <pre className="bg-secondary rounded-md p-4 text-sm font-mono text-secondary-foreground overflow-x-auto">
-{`import MiniHog from 'minihog-sdk';
+      <div className="mh-features">
+        {[
+          { ix: '01', glyph: '⊟', title: 'Event tracking', desc: 'One SDK call, any property bag. Schema-less ingest, typed downstream.' },
+          { ix: '02', glyph: '◫', title: 'Real-time analytics', desc: 'Sub-second from event → chart. Time series, funnels, retention.' },
+          { ix: '03', glyph: '↬', title: 'Attribution', desc: 'Native UTM + custom claims. Last-click with configurable lookback.' },
+          { ix: '04', glyph: '⌬', title: 'Easy integration', desc: 'JS, Swift, Kotlin, Python, Go — SDK in 6 languages.' },
+        ].map(f => (
+          <div key={f.ix} className="card">
+            <div className="ix">▸ {f.ix}</div>
+            <h4>{f.title}</h4>
+            <p>{f.desc}</p>
+            <div className="gl">{f.glyph}</div>
+          </div>
+        ))}
+      </div>
 
-MiniHog.init({
-  apiKey: 'your-api-key',
-  apiUrl: 'https://your-api.com'
-});`}
-              </pre>
-            </div>
-            <div className="rounded-lg border border-border bg-card p-6">
-              <h3 className="font-semibold mb-3">3. Track Events</h3>
-              <pre className="bg-secondary rounded-md p-4 text-sm font-mono text-secondary-foreground overflow-x-auto">
-{`MiniHog.track('signup', {
-  plan: 'pro',
-  source: 'landing_page'
-});`}
-              </pre>
-            </div>
+      <div className="mh-ascii-hr" style={{ margin: '0 0 20px' }}>
+        <span>├</span><span className="lbl">quick start</span><div className="line" /><span>┤</span>
+      </div>
+
+      <div className="mh-quickstart">
+        {[
+          { ix: '$1', title: 'Install', code: '$ npm i @minihog/sdk\n# or: pip install minihog\n# or: cargo add minihog' },
+          { ix: '$2', title: 'Init', code: 'import { Minihog } from "@minihog/sdk";\n\nconst mh = new Minihog({\n  apiKey: process.env.MINIHOG_KEY,\n});' },
+          { ix: '$3', title: 'Track', code: 'mh.track("purchase", {\n  user_id: user.id,\n  plan: "premium",\n  amount: 79.99,\n});' },
+        ].map(s => (
+          <div key={s.ix} className="step">
+            <div className="ix">{s.ix}</div>
+            <h5>{s.title}</h5>
+            <pre>{s.code}</pre>
+          </div>
+        ))}
+      </div>
+
+      <div className="mh-panel" style={{ padding: 36, textAlign: 'center', margin: '0 0 60px' }}>
+        <div className="mh-panel-body" style={{ padding: 0 }}>
+          <div style={{ fontSize: 11, color: 'var(--fg-3)', letterSpacing: '.18em', textTransform: 'uppercase', marginBottom: 14 }}>$ minihog init</div>
+          <div style={{ fontSize: 24, color: 'var(--fg-hi)', fontWeight: 700, marginBottom: 14 }}>Free until your 10 millionth event.</div>
+          <div className="mh-row" style={{ justifyContent: 'center', gap: 10 }}>
+            <Link href="/signin" className="mh-btn primary lg">Generate API key →</Link>
+            <Link href={user ? '/dashboard' : '/signin'} className="mh-btn ghost lg">Tour the dashboard</Link>
           </div>
         </div>
-      </section>
+      </div>
 
-      <section className="py-20 border-t border-border">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold mb-4">Ready to get started?</h2>
-          <p className="text-muted-foreground mb-6">Generate an API key and start tracking in under 5 minutes.</p>
-          <Link href="/signin">
-            <Button size="lg" className="gradient-primary border-0 text-primary-foreground">
-              Generate API Key <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
-      </section>
-
-      <footer className="border-t border-border py-8">
-        <div className="max-w-6xl mx-auto px-4 text-center text-sm text-muted-foreground">
-          MiniHog Analytics · Open-source product analytics
-        </div>
+      <footer style={{ padding: '20px 0', borderTop: '1px solid var(--bd)', color: 'var(--fg-3)', fontSize: 11.5, display: 'flex', justifyContent: 'space-between' }}>
+        <span>© 2026 minihog · MIT licensed</span>
+        <span>built with █ · v1.0.0</span>
       </footer>
     </div>
   );

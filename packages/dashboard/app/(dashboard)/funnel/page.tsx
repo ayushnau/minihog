@@ -2,28 +2,65 @@
 
 import { useState, useEffect } from 'react';
 import DateRangePicker from '@/components/DateRangePicker';
-import { Button } from '@/components/ui/button';
-import { api, FunnelResponse, EventNameItem } from '@/lib/api';
+import PropertyFilter from '@/components/PropertyFilter';
+import { Panel, AsciiHr, Tag, FunnelBars, ToastHost } from '@/components/terminal';
+import { api, FunnelResponse, FunnelStepDef } from '@/lib/api';
 import { format, subDays } from 'date-fns';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Plus, X, GripVertical } from 'lucide-react';
+import { useEventSchema } from '@/lib/useEventSchema';
 
 export default function FunnelPage() {
   const [from, setFrom] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [to, setTo] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [selectedSteps, setSelectedSteps] = useState<string[]>([]);
-  const [availableEvents, setAvailableEvents] = useState<EventNameItem[]>([]);
+  const [selectedSteps, setSelectedSteps] = useState<FunnelStepDef[]>([]);
   const [data, setData] = useState<FunnelResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventNames, setEventNames] = useState<string[]>([]);
+  const [namesLoading, setNamesLoading] = useState(true);
+  const [pickerValue, setPickerValue] = useState('');
+  const [autoRun, setAutoRun] = useState(false);
+  const { getPropertyKeys, getPropertyValues } = useEventSchema();
 
-  // Load available event names on mount
+  // Read URL params from AI Apply button
   useEffect(() => {
-    api.getEventNames()
-      .then(setAvailableEvents)
+    const p = new URLSearchParams(window.location.search);
+    const stepsParam = p.get('steps');
+    const fr = p.get('from');
+    const to = p.get('to');
+    if (fr) setFrom(fr);
+    if (to) setTo(to);
+    if (stepsParam) {
+      try {
+        const parsed = JSON.parse(stepsParam);
+        if (Array.isArray(parsed) && parsed.length >= 2) {
+          setSelectedSteps(parsed);
+          setAutoRun(true); // auto-trigger analysis
+        }
+      } catch {}
+    }
+  }, []);
+
+  // Fetch event names
+  useEffect(() => {
+    setNamesLoading(true);
+    fetch('/api/analytics/event-names', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && Array.isArray(d.event_names)) {
+          const names = d.event_names.map((e: { name: string }) => e.name);
+          setEventNames(names);
+          if (names.length > 0) {
+            setPickerValue(names[0]);
+            // Only set default steps if URL params didn't already set them
+            const p = new URLSearchParams(window.location.search);
+            if (!p.get('steps')) {
+              setSelectedSteps(names.slice(0, Math.min(3, names.length)).map(e => ({ event: e })));
+            }
+          }
+        }
+      })
       .catch(() => {})
-      .finally(() => setEventsLoading(false));
+      .finally(() => setNamesLoading(false));
   }, []);
 
   const loadData = async () => {
@@ -43,147 +80,214 @@ export default function FunnelPage() {
     }
   };
 
-  const addStep = (eventName: string) => {
-    setSelectedSteps((prev) => [...prev, eventName]);
+  // Auto-run when steps arrive from URL params
+  useEffect(() => {
+    if (autoRun && selectedSteps.length >= 2) {
+      setAutoRun(false);
+      loadData();
+    }
+  }, [autoRun, selectedSteps]);
+
+  useEffect(() => {
+    if (selectedSteps.length >= 2) loadData();
+  }, [from, to]);
+
+  const addStep = () => {
+    if (pickerValue) setSelectedSteps(s => [...s, { event: pickerValue }]);
   };
 
-  const removeStep = (index: number) => {
-    setSelectedSteps((prev) => prev.filter((_, i) => i !== index));
+  const removeStep = (idx: number) => setSelectedSteps(s => s.filter((_, i) => i !== idx));
+  const moveUp = (idx: number) => {
+    if (idx === 0) return;
+    setSelectedSteps(s => { const a = [...s]; [a[idx - 1], a[idx]] = [a[idx], a[idx - 1]]; return a; });
+  };
+  const moveDown = (idx: number) => {
+    setSelectedSteps(s => { if (idx >= s.length - 1) return s; const a = [...s]; [a[idx], a[idx + 1]] = [a[idx + 1], a[idx]]; return a; });
+  };
+  const updateStepFilter = (idx: number, key: string, value: string) => {
+    setSelectedSteps(s => s.map((step, i) => i === idx ? { ...step, propertyKey: key || undefined, propertyValue: value || undefined } : step));
   };
 
-  const moveStep = (index: number, direction: 'up' | 'down') => {
-    setSelectedSteps((prev) => {
-      const arr = [...prev];
-      const target = direction === 'up' ? index - 1 : index + 1;
-      if (target < 0 || target >= arr.length) return arr;
-      [arr[index], arr[target]] = [arr[target], arr[index]];
-      return arr;
-    });
-  };
+  const funnelSteps = data?.funnel.map(s => ({
+    event: s.event_name,
+    count: s.users,
+  })) ?? [];
 
-  // Events not yet added as steps
-  const unusedEvents = availableEvents.filter((e) => !selectedSteps.includes(e.name));
-
-  const chartData = data?.funnel.map((s) => ({ name: s.event_name, users: s.users })) ?? [];
+  const overallConv = data && data.funnel.length > 1
+    ? ((data.funnel[data.funnel.length - 1].users / data.funnel[0].users) * 100).toFixed(1)
+    : null;
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <h1 className="text-2xl font-bold">Funnel Analysis</h1>
-      <DateRangePicker onDateChange={(f, t) => { setFrom(f); setTo(t); }} />
-
-      {/* Step builder */}
-      <div className="rounded-lg border border-border bg-card p-5">
-        <h3 className="text-sm font-medium text-muted-foreground mb-3">Funnel Steps</h3>
-
-        {/* Selected steps */}
-        {selectedSteps.length > 0 && (
-          <div className="space-y-2 mb-4">
-            {selectedSteps.map((step, i) => (
-              <div key={`${step}-${i}`} className="flex items-center gap-2 p-2 rounded-md bg-secondary">
-                <div className="flex flex-col gap-0.5">
-                  <button
-                    onClick={() => moveStep(i, 'up')}
-                    disabled={i === 0}
-                    className="text-muted-foreground hover:text-foreground disabled:opacity-30 text-xs leading-none"
-                  >
-                    ▲
-                  </button>
-                  <button
-                    onClick={() => moveStep(i, 'down')}
-                    disabled={i === selectedSteps.length - 1}
-                    className="text-muted-foreground hover:text-foreground disabled:opacity-30 text-xs leading-none"
-                  >
-                    ▼
-                  </button>
-                </div>
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground w-6">#{i + 1}</span>
-                <span className="font-mono text-sm text-primary flex-1">{step}</span>
-                <span className="text-xs text-muted-foreground" />
-                <button onClick={() => removeStep(i)} className="text-muted-foreground hover:text-destructive">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
+    <>
+      <ToastHost />
+      <div>
+        <div className="mh-page-head">
+          <div>
+            <div className="crumb">minihog · analytics</div>
+            <h1>Funnel Analysis</h1>
+            <div className="subtitle">Multi-step conversion with drop-off rates</div>
           </div>
-        )}
+          <DateRangePicker
+            onDateChange={({ from: f, to: t }) => { setFrom(f); setTo(t); }}
+            defaultDays={30}
+          />
+        </div>
 
-        {selectedSteps.length === 0 && (
-          <p className="text-sm text-muted-foreground mb-4">Click events below to add them as funnel steps.</p>
-        )}
-
-        {/* Available events to add */}
-        <div className="border-t border-border pt-3">
-          <p className="text-xs text-muted-foreground mb-2">Available Events (click to add)</p>
-          {eventsLoading ? (
-            <p className="text-sm text-muted-foreground">Loading events...</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {unusedEvents.map((evt) => (
-                <button
-                  key={evt.name}
-                  onClick={() => addStep(evt.name)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary text-sm font-mono hover:bg-primary/20 hover:text-primary transition-colors"
-                >
-                  <Plus className="h-3 w-3" />
-                  {evt.name}
-                  <span />
-                </button>
+        {/* Builder */}
+        <Panel title="Funnel Builder" meta={`${selectedSteps.length} steps`} style={{ marginBottom: 16 }}>
+          {/* Step list */}
+          {selectedSteps.length > 0 && (
+            <div className="mh-col" style={{ gap: 8, marginBottom: 12 }}>
+              {selectedSteps.map((step, i) => (
+                <div key={i} style={{ background: 'var(--bg-2)', border: '1px solid var(--bd)', borderRadius: 'var(--rad)', padding: '6px 10px' }}>
+                  <div className="mh-row" style={{ gap: 6, alignItems: 'center' }}>
+                    <span className="mh-dim mh-tabnum" style={{ fontSize: 10, width: 18, flexShrink: 0 }}>#{i + 1}</span>
+                    <span style={{ flex: 1, color: 'var(--acc)', fontSize: 12, fontWeight: 600 }}>{step.event}</span>
+                    {step.propertyKey && step.propertyValue && (
+                      <span style={{ fontSize: 10, color: 'var(--fg-3)', background: 'var(--bg-3)', padding: '1px 6px', borderRadius: 2 }}>
+                        {step.propertyKey}={step.propertyValue}
+                      </span>
+                    )}
+                    <button className="mh-btn ghost sm" onClick={() => moveUp(i)} disabled={i === 0} style={{ padding: '1px 6px', fontSize: 11 }}>↑</button>
+                    <button className="mh-btn ghost sm" onClick={() => moveDown(i)} disabled={i === selectedSteps.length - 1} style={{ padding: '1px 6px', fontSize: 11 }}>↓</button>
+                    <button className="mh-btn ghost sm" onClick={() => removeStep(i)} style={{ padding: '1px 6px', fontSize: 11, color: 'var(--bad)' }}>×</button>
+                  </div>
+                  <PropertyFilter
+                    event={step.event}
+                    from={from}
+                    to={to}
+                    filterKey={step.propertyKey || ''}
+                    filterValue={step.propertyValue || ''}
+                    onFilterChange={(k, v) => updateStepFilter(i, k, v)}
+                    compact
+                    schemaKeys={getPropertyKeys(step.event)}
+                    schemaValues={getPropertyValues(step.event, step.propertyKey || '')}
+                  />
+                </div>
               ))}
-              {unusedEvents.length === 0 && availableEvents.length > 0 && (
-                <p className="text-xs text-muted-foreground">All events added. Remove a step to reuse it.</p>
+            </div>
+          )}
+
+          {/* Add step row */}
+          <div className="mh-row" style={{ gap: 8 }}>
+            <div className="mh-field" style={{ flex: 1 }}>
+              <span className="prompt">+</span>
+              {namesLoading ? (
+                <span className="mh-dim mh-loading" style={{ fontSize: 11 }}>loading</span>
+              ) : eventNames.length > 0 ? (
+                <select value={pickerValue} onChange={e => setPickerValue(e.target.value)}>
+                  {eventNames.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              ) : (
+                <input type="text" value={pickerValue} onChange={e => setPickerValue(e.target.value)} placeholder="event name" />
               )}
             </div>
-          )}
-        </div>
-
-        <div className="mt-4 flex items-center gap-3">
-          <Button onClick={loadData} disabled={loading || selectedSteps.length < 2}>
-            Analyze Funnel
-          </Button>
-          {selectedSteps.length < 2 && selectedSteps.length > 0 && (
-            <span className="text-xs text-muted-foreground">Add at least 2 steps</span>
-          )}
-        </div>
-      </div>
-
-      {loading && <div className="text-muted-foreground">Loading...</div>}
-      {error && <div className="text-destructive text-sm">{error}</div>}
-
-      {data && !loading && (
-        <>
-          <div className="rounded-lg border border-border bg-card p-5">
-            <h3 className="text-sm font-medium text-muted-foreground mb-4">Funnel Visualization</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,18%,18%)" />
-                <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(215,15%,55%)' }} />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: 'hsl(215,15%,55%)' }} width={120} />
-                <Tooltip contentStyle={{ background: 'hsl(220,22%,10%)', border: '1px solid hsl(220,18%,18%)', borderRadius: '8px', color: 'hsl(210,20%,92%)' }} />
-                <Bar dataKey="users" fill="hsl(210,100%,55%)" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <button className="mh-btn ghost" onClick={addStep} disabled={!pickerValue}>+ Add Step</button>
+            <button className="mh-btn primary" onClick={loadData} disabled={loading || selectedSteps.length < 2}>
+              {loading ? <span className="mh-loading">analyzing</span> : 'Analyze →'}
+            </button>
           </div>
+          {selectedSteps.length < 2 && (
+            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--fg-3)' }}>Add at least 2 steps to analyze.</div>
+          )}
+        </Panel>
 
-          <div className="rounded-lg border border-border bg-card p-5">
-            <h3 className="text-sm font-medium text-muted-foreground mb-4">Funnel Results</h3>
-            <div className="space-y-3">
-              {data.funnel.map((s) => (
-                <div key={s.step} className="flex items-center justify-between p-3 rounded-md bg-secondary">
-                  <div>
-                    <span className="text-sm font-medium">Step {s.step}: </span>
-                    <span className="font-mono text-sm text-primary">{s.event_name}</span>
-                    {s.drop_off_percentage > 0 && (
-                      <span className="text-xs text-destructive ml-2">↓ {s.drop_off_percentage.toFixed(1)}% drop-off</span>
-                    )}
-                  </div>
-                  <span className="font-mono text-sm font-bold">{s.users.toLocaleString()} users</span>
+        {error && (
+          <div className="mh-tag bad" style={{ padding: '10px 14px', fontSize: 12, marginBottom: 20 }}>
+            × {error}
+          </div>
+        )}
+
+        {loading && (
+          <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--fg-3)' }}>
+            <span className="mh-loading">computing funnel</span>
+          </div>
+        )}
+
+        {data && !loading && (
+          <>
+            {/* Summary KPIs */}
+            <div className="mh-kpi-grid" style={{ marginBottom: 20 }}>
+              <div className="mh-kpi">
+                <div className="label">⌇ Top of Funnel</div>
+                <div className="value">{(data.total_users_at_first_step || data.funnel[0]?.users || 0).toLocaleString('en-US')}</div>
+                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-3)' }}>users entered</div>
+              </div>
+              <div className="mh-kpi">
+                <div className="label">▸ Bottom of Funnel</div>
+                <div className="value">{(data.funnel[data.funnel.length - 1]?.users || 0).toLocaleString('en-US')}</div>
+                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-3)' }}>users converted</div>
+              </div>
+              <div className="mh-kpi">
+                <div className="label">⌗ Overall Conversion</div>
+                <div className="value" style={{ color: overallConv && Number(overallConv) > 30 ? 'var(--acc)' : 'var(--bad)' }}>
+                  {overallConv ?? '—'}<span className="unit">%</span>
                 </div>
-              ))}
+                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--fg-3)' }}>end-to-end rate</div>
+              </div>
             </div>
-          </div>
-        </>
-      )}
-    </div>
+
+            <AsciiHr label="funnel steps" />
+
+            <div className="funnel-split">
+              {/* Funnel bars */}
+              <Panel title="Step Breakdown" meta={`${data.funnel.length} steps`}>
+                <FunnelBars steps={funnelSteps} />
+              </Panel>
+
+              {/* Tabular detail */}
+              <Panel title="Detailed Metrics" meta="per-step analysis">
+                <table className="mh-t">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Event</th>
+                      <th>Filter</th>
+                      <th className="num">Users</th>
+                      <th className="num">Drop-off</th>
+                      <th className="num">Conv.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.funnel.map((s, i) => {
+                      const prev = i > 0 ? data.funnel[i - 1].users : s.users;
+                      const conv = i > 0 ? ((s.users / prev) * 100).toFixed(1) : '100.0';
+                      return (
+                        <tr key={s.step}>
+                          <td className="dim">#{s.step}</td>
+                          <td style={{ color: 'var(--acc)' }}>{s.event_name}</td>
+                          <td style={{ fontSize: 11, color: 'var(--fg-3)' }}>{s.property_filter || '—'}</td>
+                          <td className="num" style={{ color: 'var(--fg-hi)', fontWeight: 700 }}>
+                            {s.users.toLocaleString('en-US')}
+                          </td>
+                          <td className="num" style={{ color: s.drop_off_percentage > 0 ? 'var(--bad)' : 'var(--fg-3)' }}>
+                            {s.drop_off_percentage > 0 ? `↓ ${s.drop_off_percentage.toFixed(1)}%` : '—'}
+                          </td>
+                          <td className="num" style={{ color: Number(conv) > 70 ? 'var(--acc)' : 'var(--fg)' }}>
+                            {conv}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                <div style={{ marginTop: 16, padding: '12px', background: 'var(--bg-2)', border: '1px dashed var(--bd-2)', borderRadius: 'var(--rad)', fontSize: 12 }}>
+                  <div style={{ color: 'var(--fg-3)', marginBottom: 4, fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase' }}>Insight</div>
+                  {overallConv && Number(overallConv) > 0 ? (
+                    <span style={{ color: 'var(--fg)' }}>
+                      Your funnel converts at <span style={{ color: 'var(--acc)', fontWeight: 700 }}>{overallConv}%</span> overall.
+                      {Number(overallConv) < 10 && <span style={{ color: 'var(--warn)' }}> Consider optimizing your highest drop-off step.</span>}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--fg-3)' }}>No conversion data available for this period.</span>
+                  )}
+                </div>
+              </Panel>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }

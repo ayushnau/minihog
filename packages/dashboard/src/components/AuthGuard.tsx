@@ -16,8 +16,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-muted-foreground">Loading…</div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', fontFamily: 'var(--mono)' }}>
+        <div style={{ color: 'var(--fg-3)', fontSize: 13 }}>
+          <span style={{ color: 'var(--acc)' }}>▣</span>
+          {' '}<span className="mh-loading">loading workspace</span>
+        </div>
       </div>
     );
   }

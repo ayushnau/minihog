@@ -1,9 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Copy, Check, Trash2 } from 'lucide-react';
+import { Panel, AsciiHr, Tag, ToastHost, ConfirmModal, toast } from '@/components/terminal';
 
 interface ApiKey {
   id: string;
@@ -19,6 +17,7 @@ export default function KeysPage() {
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [confirm, setConfirm] = useState<{ open: boolean; id?: string; all?: boolean }>({ open: false });
 
   const loadKeys = async () => {
     setLoading(true);
@@ -54,11 +53,14 @@ export default function KeysPage() {
         setNewKey(data.key);
         setName('');
         loadKeys();
+        toast('ok', 'API key generated successfully');
       } else {
         setError(data.error || 'Failed to generate key');
+        toast('bad', data.error || 'Failed to generate key');
       }
     } catch {
       setError('Failed to generate API key');
+      toast('bad', 'Failed to generate API key');
     }
   };
 
@@ -66,88 +68,207 @@ export default function KeysPage() {
     if (newKey) {
       navigator.clipboard.writeText(newKey);
       setCopied(true);
+      toast('ok', 'Key copied to clipboard');
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
   const handleRevoke = async (id: string) => {
-    if (!confirm('Revoke this API key? It will stop working immediately.')) return;
     try {
       const res = await fetch(`/api/keys?id=${id}`, { method: 'DELETE', credentials: 'include' });
-      if (res.ok) loadKeys();
-      else setError((await res.json()).error || 'Failed to revoke');
+      if (res.ok) {
+        loadKeys();
+        toast('warn', 'API key revoked');
+      } else {
+        const d = await res.json();
+        setError(d.error || 'Failed to revoke');
+        toast('bad', d.error || 'Failed to revoke key');
+      }
     } catch {
       setError('Failed to revoke key');
+      toast('bad', 'Failed to revoke key');
     }
+    setConfirm({ open: false });
   };
 
   const handleRevokeAll = async () => {
-    if (!confirm('Revoke ALL API keys? They will all stop working.')) return;
     try {
       const res = await fetch('/api/keys?all=true', { method: 'DELETE', credentials: 'include' });
-      if (res.ok) loadKeys();
-      else setError((await res.json()).error || 'Failed to revoke all');
+      if (res.ok) {
+        loadKeys();
+        toast('warn', 'All API keys revoked');
+      } else {
+        const d = await res.json();
+        setError(d.error || 'Failed to revoke all');
+        toast('bad', d.error || 'Failed to revoke all keys');
+      }
     } catch {
       setError('Failed to revoke all');
+      toast('bad', 'Failed to revoke all keys');
     }
+    setConfirm({ open: false });
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <h1 className="text-2xl font-bold">API Keys</h1>
+    <>
+      <ToastHost />
 
-      {error && <div className="text-destructive text-sm">{error}</div>}
+      <ConfirmModal
+        open={confirm.open && !confirm.all}
+        title="Revoke API Key"
+        body={<>This key will stop working immediately. <strong>This cannot be undone.</strong></>}
+        danger
+        confirmLabel="Revoke key"
+        onCancel={() => setConfirm({ open: false })}
+        onConfirm={() => confirm.id && handleRevoke(confirm.id)}
+      />
 
-      <div className="rounded-lg border border-border bg-card p-5">
-        <h3 className="text-sm font-medium text-muted-foreground mb-3">Generate New Key</h3>
-        <div className="flex gap-3">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Key name" className="flex-1" />
-          <Button onClick={handleGenerate} disabled={!name}>Generate</Button>
-        </div>
+      <ConfirmModal
+        open={confirm.open && !!confirm.all}
+        title="Revoke All API Keys"
+        body={<>All <strong>{keys.length}</strong> API keys will stop working immediately. Any SDKs using these keys will stop sending data.</>}
+        danger
+        confirmLabel="Revoke all keys"
+        onCancel={() => setConfirm({ open: false })}
+        onConfirm={handleRevokeAll}
+      />
 
-        {newKey && (
-          <div className="mt-4 p-4 rounded-md bg-success/10 border border-success/20">
-            <p className="text-sm text-success mb-2">Key generated! Copy it now — it won't be shown again.</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-sm font-mono break-all text-foreground">{newKey}</code>
-              <Button variant="outline" size="sm" onClick={handleCopy}>
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              </Button>
-            </div>
-            <button type="button" onClick={() => setNewKey(null)} className="text-xs text-muted-foreground mt-2 hover:underline">
-              I've copied the key
-            </button>
+      <div>
+        <div className="mh-page-head">
+          <div>
+            <div className="crumb">minihog · workspace</div>
+            <h1>API Keys</h1>
+            <div className="subtitle">Generate and manage authentication keys for event ingestion</div>
           </div>
-        )}
-      </div>
-
-      <div className="rounded-lg border border-border bg-card p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium text-muted-foreground">Your API Keys</h3>
           {keys.length > 0 && (
-            <Button variant="outline" size="sm" onClick={handleRevokeAll}>
-              <Trash2 className="h-3 w-3 mr-1" /> Revoke All
-            </Button>
+            <button className="mh-btn danger sm" onClick={() => setConfirm({ open: true, all: true })}>
+              ⊗ Revoke All
+            </button>
           )}
         </div>
-        {loading ? (
-          <p className="text-muted-foreground text-sm">Loading…</p>
-        ) : keys.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No API keys yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {keys.map((k) => (
-              <div key={k.id} className="flex items-center justify-between p-3 rounded-md bg-secondary">
-                <div>
-                  <p className="text-sm font-medium">{k.name}</p>
-                  <p className="text-xs text-muted-foreground">Created {new Date(k.createdAt).toLocaleDateString()}</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => handleRevoke(k.id)}>Revoke</Button>
-              </div>
-            ))}
+
+        {error && (
+          <div className="mh-tag bad" style={{ padding: '10px 14px', fontSize: 12, marginBottom: 20 }}>
+            × {error}
           </div>
         )}
+
+        {/* Generate new key */}
+        <Panel title="Generate New Key" meta="one-time reveal" style={{ marginBottom: 16 }}>
+          <div className="mh-row" style={{ gap: 8 }}>
+            <div className="mh-field" style={{ flex: 1 }}>
+              <span className="prompt">⌬</span>
+              <input
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Key name (e.g. production, staging)"
+                onKeyDown={e => e.key === 'Enter' && handleGenerate()}
+              />
+            </div>
+            <button
+              className="mh-btn primary"
+              onClick={handleGenerate}
+              disabled={!name.trim()}
+            >
+              Generate →
+            </button>
+          </div>
+
+          {newKey && (
+            <div style={{ marginTop: 14, border: '1px dashed var(--acc-bd)', background: 'var(--acc-soft)', borderRadius: 'var(--rad)', padding: 14 }}>
+              <div style={{ fontSize: 11, color: 'var(--acc)', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 8 }}>
+                ✓ Key generated — copy now, won't be shown again
+              </div>
+              <div className="mh-row" style={{ gap: 8 }}>
+                <code style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--bd)', padding: '8px 12px', fontSize: 12, borderRadius: 'var(--rad)', color: 'var(--fg-hi)', wordBreak: 'break-all', fontFamily: 'var(--mono)' }}>
+                  {newKey}
+                </code>
+                <button className="mh-btn sm" onClick={handleCopy}>
+                  {copied ? '✓ Copied' : '⎘ Copy'}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNewKey(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--fg-3)', cursor: 'pointer', fontSize: 11, fontFamily: 'var(--mono)', marginTop: 10, padding: 0 }}
+              >
+                I've saved the key ×
+              </button>
+            </div>
+          )}
+        </Panel>
+
+        <AsciiHr label="active keys" />
+
+        {/* Keys table */}
+        <Panel
+          title="Your API Keys"
+          meta={`${keys.length} key${keys.length !== 1 ? 's' : ''}`}
+          right={keys.length > 0 ? <Tag>{keys.length} active</Tag> : undefined}
+        >
+          {loading ? (
+            <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--fg-3)' }}>
+              <span className="mh-loading">loading</span>
+            </div>
+          ) : keys.length === 0 ? (
+            <div className="mh-muted-card">
+              <div style={{ marginBottom: 8, color: 'var(--acc)', fontSize: 20 }}>⌬</div>
+              No API keys yet. Generate your first key to start tracking events.
+            </div>
+          ) : (
+            <table className="mh-t">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Key (masked)</th>
+                  <th>Created</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {keys.map((k) => (
+                  <tr key={k.id}>
+                    <td style={{ color: 'var(--fg-hi)', fontWeight: 600 }}>{k.name}</td>
+                    <td className="dim" style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>
+                      mh_••••••••••••{k.id.slice(-4)}
+                    </td>
+                    <td className="dim" style={{ fontSize: 11 }}>
+                      {new Date(k.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button
+                        className="mh-btn danger sm"
+                        onClick={() => setConfirm({ open: true, id: k.id })}
+                      >
+                        Revoke
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Panel>
+
+        <AsciiHr label="usage" />
+
+        <Panel title="SDK Usage" meta="quick reference">
+          <div style={{ fontSize: 12, color: 'var(--fg-2)', lineHeight: 1.6 }}>
+            <div style={{ marginBottom: 12 }}>Send your API key in the <code style={{ background: 'var(--bg-2)', padding: '1px 6px', borderRadius: 2, color: 'var(--acc)', fontSize: 11 }}>X-API-Key</code> header:</div>
+            <pre style={{ background: 'var(--bg)', border: '1px solid var(--bd)', padding: '12px', borderRadius: 'var(--rad)', fontSize: 11.5, color: 'var(--fg)', fontFamily: 'var(--mono)', margin: 0 }}>
+{`import MiniHog from 'minihog-sdk';
+
+MiniHog.init({
+  apiKey: 'YOUR_API_KEY_HERE',
+  environment: 'production',
+});
+
+MiniHog.track('signup', { plan: 'pro' });`}
+            </pre>
+          </div>
+        </Panel>
       </div>
-    </div>
+    </>
   );
 }

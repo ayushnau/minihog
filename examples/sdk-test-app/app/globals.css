@@ -232,18 +232,91 @@ select.input {
   font-weight: 500;
 }
 
+/* Header */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.dash-link {
+  font-size: 0.8rem;
+  color: #3b82f6;
+  text-decoration: none;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #2a2e3a;
+  border-radius: 6px;
+  white-space: nowrap;
+  margin-top: 0.25rem;
+  transition: border-color 0.15s;
+}
+.dash-link:hover { border-color: #3b82f6; }
+
+/* Journey simulator */
+.journey-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.5rem;
+}
+
+.journey-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.85rem;
+  background: #0f1117;
+  border: 1px solid #2a2e3a;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+  color: #e0e4ec;
+  position: relative;
+}
+.journey-btn:hover:not(:disabled) {
+  border-color: var(--journey-color, #3b82f6);
+  background: rgba(255,255,255,0.02);
+}
+.journey-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.journey-btn.running { border-color: var(--journey-color, #3b82f6); }
+
+.journey-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--journey-color, #e0e4ec);
+}
+.journey-desc {
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+.journey-steps {
+  font-size: 0.72rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: #4b5563;
+  margin-top: 0.1rem;
+}
+.journey-running {
+  font-size: 0.72rem;
+  color: var(--journey-color, #4ade80);
+  font-family: 'SF Mono', monospace;
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }
+
 /* Preset event buttons */
 .preset-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: 0.5rem;
 }
 
 .preset-btn {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.75rem;
+  gap: 0.2rem;
+  padding: 0.7rem;
   background: #0f1117;
   border: 1px solid #2a2e3a;
   border-radius: 8px;
@@ -252,39 +325,24 @@ select.input {
   transition: all 0.15s;
   color: #e0e4ec;
 }
+.preset-btn:hover { border-color: #3b82f6; background: rgba(59,130,246,0.04); }
+.preset-btn:active { transform: scale(0.97); }
 
-.preset-btn:hover {
-  border-color: #3b82f6;
-  background: rgba(59, 130, 246, 0.05);
-}
-
-.preset-btn:active {
-  transform: scale(0.98);
-}
-
-.preset-name {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
+.preset-emoji { font-size: 1rem; line-height: 1; }
+.preset-name  { font-size: 0.82rem; font-weight: 600; }
 .preset-event {
   font-family: 'SF Mono', 'Fira Code', monospace;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: #3b82f6;
+  background: transparent;
+  padding: 0;
 }
-
-.preset-props {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-top: 0.15rem;
-}
-
+.preset-props { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.1rem; }
 .preset-prop-tag {
-  font-size: 0.7rem;
-  color: #8b92a5;
-  background: rgba(255, 255, 255, 0.04);
-  padding: 0.1rem 0.35rem;
+  font-size: 0.67rem;
+  color: #6b7280;
+  background: rgba(255,255,255,0.04);
+  padding: 0.1rem 0.3rem;
   border-radius: 3px;
   font-family: 'SF Mono', 'Fira Code', monospace;
 }
@@ -326,6 +384,12 @@ select.input {
 
 .log-entry.info {
   color: #93c5fd;
+}
+
+.log-entry.journey {
+  color: #f0b429;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .log-time {

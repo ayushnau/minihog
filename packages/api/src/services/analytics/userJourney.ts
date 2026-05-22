@@ -90,12 +90,13 @@ export async function getUserJourneys(
     }
   }
 
-  // Group events by user
+  // Group events by user, tracking latest timestamp per user
   const userEvents: Record<string, Array<{
     event_name: string;
     timestamp: string;
     properties: Record<string, any>;
   }>> = {};
+  const userLatest: Record<string, number> = {};
 
   events.forEach((event) => {
     if (!userEvents[event.distinctId]) {
@@ -107,16 +108,21 @@ export async function getUserJourneys(
       timestamp: event.timestamp.toISOString(),
       properties: event.properties as Record<string, any>,
     });
+
+    const ts = event.timestamp.getTime();
+    if (!userLatest[event.distinctId] || ts > userLatest[event.distinctId]) {
+      userLatest[event.distinctId] = ts;
+    }
   });
 
-  // Convert to array, sort by total events (descending), and limit
+  // Convert to array, sort by most recent activity first, and limit
   return Object.entries(userEvents)
     .map(([user_id, events]) => ({
       user_id,
       events,
       total_events: events.length,
     }))
-    .sort((a, b) => b.total_events - a.total_events)
+    .sort((a, b) => (userLatest[b.user_id] ?? 0) - (userLatest[a.user_id] ?? 0))
     .slice(0, limit);
 }
 
@@ -209,71 +215,65 @@ export async function getCommonUserPaths(
     }
   }
 
-  // Build a map of user paths with event details (including button_id)
-  const userPathsWithDetails: Record<string, Array<{
-    event_name: string;
-    button_id?: string;
-  }>> = {};
+  const PRIMARY_PROP: Record<string, string> = {
+    page_view:           'page',
+    button_click:        'button_id',
+    signup:              'method',
+    purchase:            'product',
+    add_to_cart:         'product',
+    search:              'query',
+    share:               'target',
+    settings_change:     'setting',
+    onboarding_complete: 'steps_completed',
+  };
 
-  // Group events by user with button_id info
-  allEvents.forEach((event) => {
-    if (!userPathsWithDetails[event.distinctId]) {
-      userPathsWithDetails[event.distinctId] = [];
+  function getPrimaryPropValue(eventName: string, properties: Record<string, any>): string | undefined {
+    const key = PRIMARY_PROP[eventName];
+    if (key && properties[key] !== null && properties[key] !== undefined && properties[key] !== '') {
+      return String(properties[key]);
     }
-    
-    const properties = event.properties as Record<string, any>;
-    userPathsWithDetails[event.distinctId].push({
+    return undefined;
+  }
+
+  // Build per-user ordered step list with primary property value
+  const userSteps: Record<string, Array<{ event_name: string; prop_value?: string }>> = {};
+  allEvents.forEach((event) => {
+    if (!userSteps[event.distinctId]) userSteps[event.distinctId] = [];
+    const props = event.properties as Record<string, any>;
+    userSteps[event.distinctId].push({
       event_name: event.eventName,
-      button_id: properties?.button_id,
+      prop_value: getPrimaryPropValue(event.eventName, props),
     });
   });
 
-  // Count path occurrences with button_id info
-  const pathCounts: Record<string, { count: number; buttonIds: Map<string, number> }> = {};
-  let totalPaths = 0;
+  // Sliding window: extract every consecutive window of size 2 and 3
+  // This surfaces recurring short patterns across users rather than unique full sessions
+  const windowSizes = [3, 2];
+  const windowCounts: Record<string, { steps: Array<{ event_name: string; prop_value?: string }>; users: Set<string> }> = {};
 
-  Object.values(userPathsWithDetails).forEach((path) => {
-    // Only consider paths of minimum length
-    if (path.length >= minPathLength) {
-      // Create path string with button_id if available
-      const pathStr = path.map(p => {
-        if (p.button_id) {
-          return `${p.event_name} [${p.button_id}]`;
-        }
-        return p.event_name;
-      }).join(' → ');
-      
-      if (!pathCounts[pathStr]) {
-        pathCounts[pathStr] = { count: 0, buttonIds: new Map() };
+  for (const [distinctId, steps] of Object.entries(userSteps)) {
+    for (const size of windowSizes) {
+      for (let i = 0; i <= steps.length - size; i++) {
+        const window = steps.slice(i, i + size);
+        const key = window.map(s => s.prop_value ? `${s.event_name}(${s.prop_value})` : s.event_name).join(' → ');
+        if (!windowCounts[key]) windowCounts[key] = { steps: window, users: new Set() };
+        // One entry per user per window pattern — counts unique users, not occurrences
+        windowCounts[key].users.add(distinctId);
       }
-      pathCounts[pathStr].count++;
-      totalPaths++;
     }
-  });
+  }
 
-  // Convert to array, sort by count, and limit results
-  const paths = Object.entries(pathCounts)
-    .map(([pathStr, data]) => {
-      // Parse the path string back to array, keeping button_id info
-      const pathArray = pathStr.split(' → ').map(step => {
-        // Check if step contains button_id in format "event_name [button_id]"
-        const match = step.match(/^(.+?)\s\[(.+?)\]$/);
-        if (match) {
-          return { event_name: match[1], button_id: match[2] };
-        }
-        return { event_name: step };
-      });
-      
-      return {
-        path: pathArray.map(p => p.event_name),
-        path_with_ids: pathArray,
-        count: data.count,
-        percentage: totalPaths > 0 ? (data.count / totalPaths) * 100 : 0,
-      };
-    })
-    .sort((a, b) => b.count - a.count)
-    .slice(0, maxResults);
+  const totalUsers = Object.keys(userSteps).length || 1;
 
-  return paths;
+  return Object.values(windowCounts)
+    .filter(w => w.users.size >= 1)
+    .sort((a, b) => b.users.size - a.users.size || b.steps.length - a.steps.length)
+    .slice(0, maxResults)
+    .map(w => ({
+      path: w.steps.map(s => s.prop_value ? `${s.event_name}(${s.prop_value})` : s.event_name),
+      path_with_ids: w.steps.map(s => ({ event_name: s.event_name, prop_value: s.prop_value })),
+      count: w.users.size,
+      percentage: (w.users.size / totalUsers) * 100,
+    }));
 }
 

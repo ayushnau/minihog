@@ -65,7 +65,7 @@ router.get('/funnel', async (req: Request, res: Response, next: NextFunction) =>
     const fromDate = params.from ? new Date(params.from) : new Date(0);
     const toDate = params.to ? new Date(params.to + 'T23:59:59.999Z') : new Date();
 
-    const result = await getFunnelAnalysis(steps, fromDate, toDate);
+    const result = await getFunnelAnalysis(steps.map(s => ({ event: s })), fromDate, toDate);
 
     res.json({
       success: true,

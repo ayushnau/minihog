@@ -43,7 +43,7 @@ export interface UserJourney {
 
 export interface CommonPath {
   path: string[];
-  path_with_ids?: Array<{ event_name: string; button_id?: string }>;
+  path_with_ids?: Array<{ event_name: string; prop_value?: string }>;
   count: number;
   percentage: number;
 }
@@ -65,13 +65,20 @@ export interface EventCountResponse {
 export interface FunnelStep {
   step: number;
   event_name: string;
+  property_filter?: string;
   users: number;
   drop_off_percentage: number;
 }
 
+export interface FunnelStepDef {
+  event: string;
+  propertyKey?: string;
+  propertyValue?: string;
+}
+
 export interface FunnelResponse {
   success: boolean;
-  steps: string[];
+  steps: FunnelStepDef[];
   from: string;
   to: string;
   funnel: FunnelStep[];
@@ -117,6 +124,22 @@ export const api = {
     return data.event_names;
   },
 
+  getPropertyKeys: async (event: string, from: string, to: string): Promise<string[]> => {
+    const { data } = await apiClient.get<{ success: boolean; keys: string[] }>(
+      '/api/analytics/property-keys',
+      { params: { event, from, to } }
+    );
+    return data.keys || [];
+  },
+
+  getPropertyValues: async (event: string, key: string, from: string, to: string): Promise<string[]> => {
+    const { data } = await apiClient.get<{ success: boolean; values: string[] }>(
+      '/api/analytics/property-values',
+      { params: { event, key, from, to } }
+    );
+    return data.values || [];
+  },
+
   getEventCounts: async (
     event: string,
     from: string,
@@ -127,6 +150,8 @@ export const api = {
       includeJourneys?: boolean;
       propertyKey?: string;
       granularity?: 'day' | 'hour';
+      filterKey?: string;
+      filterValue?: string;
     }
   ): Promise<EventCountResponse> => {
     const params: Record<string, string> = { event, from, to };
@@ -135,13 +160,19 @@ export const api = {
     if (options?.includeJourneys) params.include_journeys = 'true';
     if (options?.propertyKey) params.property_key = options.propertyKey;
     if (options?.granularity) params.granularity = options.granularity;
+    if (options?.filterKey) params.filter_key = options.filterKey;
+    if (options?.filterValue) params.filter_value = options.filterValue;
     const { data } = await apiClient.get<EventCountResponse>('/api/analytics/events', { params });
     return data;
   },
 
-  getFunnelAnalysis: async (steps: string[], from: string, to: string): Promise<FunnelResponse> => {
+  getFunnelAnalysis: async (
+    steps: Array<{ event: string; propertyKey?: string; propertyValue?: string }>,
+    from: string,
+    to: string
+  ): Promise<FunnelResponse> => {
     const { data } = await apiClient.get<FunnelResponse>('/api/analytics/funnel', {
-      params: { steps: steps.join(','), from, to },
+      params: { steps: JSON.stringify(steps), from, to },
     });
     return data;
   },
@@ -150,17 +181,35 @@ export const api = {
     cohort: string,
     day: number,
     from: string,
-    to: string
+    to: string,
+    filterKey?: string,
+    filterValue?: string
   ): Promise<RetentionResponse> => {
-    const { data } = await apiClient.get<RetentionResponse>('/api/analytics/retention', {
-      params: { cohort, day, from, to },
-    });
+    const params: Record<string, string | number> = { cohort, day, from, to };
+    if (filterKey) params.filter_key = filterKey;
+    if (filterValue) params.filter_value = filterValue;
+    const { data } = await apiClient.get<RetentionResponse>('/api/analytics/retention', { params });
     return data;
   },
 
   getAttributionAnalytics: async (): Promise<AttributionResponse> => {
     const { data } = await apiClient.get<AttributionResponse>('/api/analytics/attribution');
     return data;
+  },
+
+  getRetentionHeatmap: async (cohort: string, from: string, to: string): Promise<{
+    success: boolean; cohort: string; days: number[];
+    cohorts: Array<{ week: string; weekStart: string; size: number; retentions: (number | null)[] }>;
+    avg_retentions: (number | null)[];
+    total_cohort_size: number;
+  }> => {
+    const { data } = await apiClient.get('/api/analytics/retention-heatmap', { params: { cohort, from, to } });
+    return data;
+  },
+
+  getLiveEvents: async (): Promise<Array<{ id: string; eventName: string; distinctId: string; timestamp: string; properties: Record<string, unknown> }>> => {
+    const { data } = await apiClient.get<{ success: boolean; events: Array<{ id: string; eventName: string; distinctId: string; timestamp: string; properties: Record<string, unknown> }> }>('/api/analytics/live');
+    return data.events || [];
   },
 
   healthCheck: async (): Promise<{ status: string; timestamp: string }> => {

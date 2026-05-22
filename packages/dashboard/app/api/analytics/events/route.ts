@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
     const includeJourneys = searchParams.get('include_journeys');
     const propertyKey = searchParams.get('property_key');
     const granularity = searchParams.get('granularity');
+    const filterKey = searchParams.get('filter_key');
+    const filterValue = searchParams.get('filter_value');
 
     const token = request.cookies.get('auth-token')?.value;
     if (!token) {
@@ -31,6 +33,8 @@ export async function GET(request: NextRequest) {
     if (includeJourneys) url.searchParams.set('include_journeys', includeJourneys);
     if (propertyKey) url.searchParams.set('property_key', propertyKey);
     if (granularity) url.searchParams.set('granularity', granularity);
+    if (filterKey) url.searchParams.set('filter_key', filterKey);
+    if (filterValue) url.searchParams.set('filter_value', filterValue);
 
     const response = await fetch(url.toString(), {
       method: 'GET',

@@ -70,10 +70,55 @@ model User {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
-  apiKeys   ApiKey[]
-  events    Event[]
+  apiKeys      ApiKey[]
+  events       Event[]
+  aiContexts   AiContext[]
+  aiSessions   AiSession[]
+  eventSchemas EventSchema[]
 
   @@map("users")
+}
+
+// Event Schema table - user-defined event schemas for documentation and AI context
+model EventSchema {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  description String   @default("")
+  properties  Json     @default("[]")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, name])
+  @@map("event_schemas")
+}
+
+// AI context documents — uploaded by users for AI assistant grounding
+model AiContext {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("ai_context")
+}
+
+// AI conversation sessions — persists messages across page reloads
+model AiSession {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id") @unique
+  messages  Json     @default("[]")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_sessions")
 }
 
 // API Keys table - stores API keys for users

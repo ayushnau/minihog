@@ -212,5 +212,26 @@ router.post('/batch', validateApiKey, async (req: Request, res: Response, next: 
   }
 });
 
+/**
+ * DELETE /track?distinct_id=xxx
+ * Deletes all events for a given distinct_id scoped to the authenticated API key.
+ * Requires API key authentication.
+ */
+router.delete('/', validateApiKey, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const schema = z.object({ distinct_id: z.string().min(1) });
+    const { distinct_id } = schema.parse(req.query);
+    const apiKeyId = (req as any).apiKeyId;
+
+    const where: any = { distinctId: distinct_id };
+    if (apiKeyId) where.apiKeyId = apiKeyId;
+
+    const result = await prisma.event.deleteMany({ where });
+    res.json({ success: true, deleted: result.count });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export { router as trackRouter };
 
