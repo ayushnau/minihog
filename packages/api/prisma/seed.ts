@@ -9,12 +9,12 @@ const API_KEY_ID = '4a576c38-e4b5-4458-ae8a-b583ec4fd4c6';
 async function ensureUserAndKey() {
   await prisma.user.upsert({
     where: { id: USER_ID },
-    update: {},
+    update: { passwordHash: '$2a$10$EqVCvzu4wnmL4j6Hvxgc/eQFPCuWS89Nb4w8E5PxfuJIqfKn/eXPi' },
     create: {
       id: USER_ID,
       username: 'demo',
       email: 'demo@minihog.dev',
-      passwordHash: '$2a$10$placeholder.hash.for.seed.user.only',
+      passwordHash: '$2a$10$EqVCvzu4wnmL4j6Hvxgc/eQFPCuWS89Nb4w8E5PxfuJIqfKn/eXPi',
     },
   });
   await prisma.apiKey.upsert({

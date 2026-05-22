@@ -45,3 +45,6 @@ package-lock.json/*
 # Claude Code
 .claude/
 .ai/
+
+
+*.tsbuildinfo

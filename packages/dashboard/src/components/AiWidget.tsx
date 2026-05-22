@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAiSettings, isAiConfigured, aiSettingsToHeaders } from '@/lib/aiSettings';
+import { runOllamaChat } from '@/lib/ollamaChat';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -183,6 +184,8 @@ export default function AiWidget() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Raw message history for Ollama's client-side agentic loop (no DB persistence)
+  const ollamaHistory = useRef<any[]>([]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -197,19 +200,20 @@ export default function AiWidget() {
     }
   }, [open]);
 
-  // Load session history on first open
+  // Load session history — Ollama is in-memory only, Gemini loads from backend DB
   const loadSession = async () => {
-    try {
-      const r = await fetch('/api/ai/session', { credentials: 'include' });
-      const d = await r.json();
-      if (d.success && Array.isArray(d.messages) && d.messages.length > 0) {
-        setMessages(d.messages.map((m: any, i: number) => ({
-          id: String(i),
-          role: m.role,
-          content: m.content || '',
-        })));
-      }
-    } catch {}
+    const s = getAiSettings();
+    if (s.provider !== 'ollama') {
+      try {
+        const r = await fetch('/api/ai/session', { credentials: 'include' });
+        const d = await r.json();
+        if (d.success && Array.isArray(d.messages) && d.messages.length > 0) {
+          setMessages(d.messages.map((m: any, i: number) => ({
+            id: String(i), role: m.role, content: m.content || '',
+          })));
+        }
+      } catch {}
+    }
     setSessionLoaded(true);
   };
 
@@ -222,6 +226,48 @@ export default function AiWidget() {
         .catch(() => {});
     }
   }, [open]);
+
+  // ── Shared UI updaters (used by both Ollama and Gemini paths) ────────────
+
+  const applySSEEvent = (assistantId: string, event: string, payload: any) => {
+    switch (event) {
+      case 'text':
+        setMessages(prev => prev.map(m => m.id === assistantId
+          ? { ...m, content: m.content + payload.token, thinking: undefined } : m));
+        break;
+      case 'thinking':
+        setMessages(prev => prev.map(m => m.id === assistantId
+          ? { ...m, thinking: payload.message } : m));
+        break;
+      case 'tool_start':
+        setMessages(prev => prev.map(m => m.id === assistantId
+          ? { ...m, toolCalls: [...(m.toolCalls || []), { name: payload.name, args: payload.args }] } : m));
+        break;
+      case 'tool_end':
+        setMessages(prev => prev.map(m => {
+          if (m.id !== assistantId) return m;
+          const tcs = [...(m.toolCalls || [])];
+          const idx = tcs.findLastIndex(t => t.name === payload.name && !t.result);
+          if (idx >= 0) tcs[idx] = { ...tcs[idx], result: payload.result };
+          return { ...m, toolCalls: tcs };
+        }));
+        break;
+      case 'action':
+        setMessages(prev => prev.map(m => m.id === assistantId
+          ? { ...m, actions: [...(m.actions || []), payload as Action] } : m));
+        break;
+      case 'error':
+        setMessages(prev => prev.map(m => m.id === assistantId
+          ? { ...m, content: (m.content || '') + `\n\n⚠ ${payload.message}`, streaming: false, thinking: undefined } : m));
+        setStreaming(false);
+        break;
+      case 'done':
+        setMessages(prev => prev.map(m => m.id === assistantId
+          ? { ...m, streaming: false, thinking: undefined } : m));
+        setStreaming(false);
+        break;
+    }
+  };
 
   // ── Send message ──────────────────────────────────────────────────────────
 
@@ -238,8 +284,30 @@ export default function AiWidget() {
     setInput('');
     setStreaming(true);
 
+    const aiCfg = getAiSettings();
+
+    // ── Ollama: browser → Ollama directly ────────────────────────────────────
+    if (aiCfg.provider === 'ollama') {
+      const updatedHistory = await runOllamaChat(
+        aiCfg,
+        ollamaHistory.current,
+        text.trim(),
+        {
+          onToken:     (token)         => applySSEEvent(assistantId, 'text',       { token }),
+          onThinking:  (message)       => applySSEEvent(assistantId, 'thinking',   { message }),
+          onToolStart: (name, args)    => applySSEEvent(assistantId, 'tool_start', { name, args }),
+          onToolEnd:   (name, result)  => applySSEEvent(assistantId, 'tool_end',   { name, result }),
+          onAction:    (action)        => applySSEEvent(assistantId, 'action',     action),
+          onError:     (message)       => applySSEEvent(assistantId, 'error',      { message }),
+          onDone:      ()              => applySSEEvent(assistantId, 'done',       {}),
+        },
+      );
+      ollamaHistory.current = updatedHistory;
+      return;
+    }
+
+    // ── Gemini (and any other provider): backend proxy — completely unchanged ─
     try {
-      const aiCfg = getAiSettings();
       const res = await fetch('/api/ai/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...aiSettingsToHeaders(aiCfg) },
@@ -279,48 +347,7 @@ export default function AiWidget() {
           let payload: any;
           try { payload = JSON.parse(data); } catch { continue; }
 
-          switch (event) {
-            case 'text':
-              setMessages(prev => prev.map(m => m.id === assistantId
-                ? { ...m, content: m.content + payload.token, thinking: undefined } : m));
-              break;
-
-            case 'thinking':
-              setMessages(prev => prev.map(m => m.id === assistantId
-                ? { ...m, thinking: payload.message } : m));
-              break;
-
-            case 'tool_start':
-              setMessages(prev => prev.map(m => m.id === assistantId
-                ? { ...m, toolCalls: [...(m.toolCalls || []), { name: payload.name, args: payload.args }] } : m));
-              break;
-
-            case 'tool_end':
-              setMessages(prev => prev.map(m => {
-                if (m.id !== assistantId) return m;
-                const tcs = [...(m.toolCalls || [])];
-                const idx = tcs.findLastIndex(t => t.name === payload.name && !t.result);
-                if (idx >= 0) tcs[idx] = { ...tcs[idx], result: payload.result };
-                return { ...m, toolCalls: tcs };
-              }));
-              break;
-
-            case 'action':
-              setMessages(prev => prev.map(m => m.id === assistantId
-                ? { ...m, actions: [...(m.actions || []), payload as Action] } : m));
-              break;
-
-            case 'error':
-              setMessages(prev => prev.map(m => m.id === assistantId
-                ? { ...m, content: m.content + `\n\n⚠ ${payload.message}`, streaming: false, thinking: undefined } : m));
-              break;
-
-            case 'done':
-              setMessages(prev => prev.map(m => m.id === assistantId
-                ? { ...m, streaming: false, thinking: undefined } : m));
-              setStreaming(false);
-              break;
-          }
+          applySSEEvent(assistantId, event, payload);
         }
       }
     } catch {
