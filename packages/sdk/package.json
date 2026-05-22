@@ -1,6 +1,6 @@
 {
   "name": "minihog-sdk",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "JavaScript SDK for MiniHog analytics - track events, funnels, retention, and attribution",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

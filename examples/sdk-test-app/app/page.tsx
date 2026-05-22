@@ -298,6 +298,35 @@ export default function Home() {
         </a>
       </div>
 
+      {/* Restaurant description */}
+      <div className="card" style={{ borderLeft: '3px solid #f0b429', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#f0b429', fontWeight: 700, marginBottom: 6 }}>About This Demo</div>
+            <div style={{ fontSize: '0.97rem', fontWeight: 700, color: '#e0e4ec', marginBottom: 6 }}>Bella Cucina — Italian Restaurant</div>
+            <p style={{ fontSize: '0.82rem', color: '#8b92a5', lineHeight: 1.65, margin: 0 }}>
+              A contemporary Italian restaurant offering dine-in, takeaway, and delivery. Guests can browse the full menu by category (starters, pasta, pizza, mains, desserts), make table reservations, and place online orders with a loyalty programme.
+            </p>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 180 }}>
+            <div style={{ fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6b7280', fontWeight: 700, marginBottom: 2 }}>Key User Actions</div>
+            {[
+              { emoji: '📋', label: 'Browse menu by category' },
+              { emoji: '📅', label: 'Reserve a table' },
+              { emoji: '🛒', label: 'Place a delivery / takeaway order' },
+              { emoji: '⭐', label: 'Join loyalty programme' },
+              { emoji: '🏷️', label: 'Apply discount coupons' },
+              { emoji: '⭐', label: 'Submit a review' },
+            ].map(item => (
+              <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', color: '#8b92a5' }}>
+                <span>{item.emoji}</span>
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Setup */}
       <div className="card">
         <div className="card-header">

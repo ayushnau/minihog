@@ -408,7 +408,7 @@ export default function AiWidget() {
                   ⊡ {docCount} doc{docCount > 1 ? 's' : ''}
                 </span>
               )}
-              <a href="/settings#ai-context" className="ai-head-btn" onClick={() => setOpen(false)} title="Manage context docs in Settings">
+              <a href="https://www.npmjs.com/package/minihog-sdk" className="ai-head-btn" target="_blank" rel="noreferrer" title="SDK docs on npm">
                 ⊞ docs
               </a>
               <button className="ai-head-btn" onClick={clearChat} title="Clear chat">⊘</button>

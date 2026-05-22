@@ -4,6 +4,10 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'MiniHog Dashboard',
   description: 'Self-hosted product analytics — events, funnels, retention, attribution.',
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

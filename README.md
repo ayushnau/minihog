@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/ayushnautiyal/minihog/refs/heads/main/.github/banner.png" alt="MiniHog Banner" width="100%" />
+<img src="https://image.thum.io/get/width/1280/crop/720/noanimate/https://dashboard-two-bice-3g9ewrov9e.vercel.app/dashboard" alt="MiniHog Dashboard" width="100%" style="border-radius:8px" />
 
 <div align="center">
 
