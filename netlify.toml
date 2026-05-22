@@ -5,6 +5,9 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Force npm to install devDependencies even when NODE_ENV=production
+  # Next.js needs TypeScript and @types/* to build
+  NPM_FLAGS = "--include=dev"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
