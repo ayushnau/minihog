@@ -477,14 +477,14 @@ aiRouter.post('/chat/stream', async (req: Request, res: Response) => {
           body: JSON.stringify(body),
         });
       } catch {
-        const hint = AI_PROVIDER === 'ollama' ? ` Is Ollama running at ${OLLAMA_BASE}?` : '';
-        sseWrite(res, 'error', { message: `Cannot reach ${AI_PROVIDER} API.${hint}` });
+        const hint = provider === 'ollama' ? ` Is Ollama running at ${chat.url}?` : '';
+        sseWrite(res, 'error', { message: `Cannot reach ${provider} API.${hint}` });
         break;
       }
 
       if (!aiRes.ok) {
         const errText = await aiRes.text();
-        sseWrite(res, 'error', { message: `${AI_PROVIDER} error ${aiRes.status}: ${errText}` });
+        sseWrite(res, 'error', { message: `${provider} error ${aiRes.status}: ${errText}` });
         break;
       }
 

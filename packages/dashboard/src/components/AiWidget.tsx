@@ -402,90 +402,81 @@ export default function AiWidget() {
               </a>
             </div>
           ) : (
-
-          /* Messages body */
-          <div className="ai-body">
-            {messages.length === 0 ? (
-              <div className="ai-empty">
-                <div className="ai-empty-glyph">◈</div>
-                <div className="ai-empty-title">Analytics AI</div>
-                <div className="ai-empty-sub">Ask anything about your data</div>
-                <div className="ai-suggestions">
-                  {SUGGESTIONS.map(s => (
-                    <button key={s} className="ai-suggestion" onClick={() => send(s)}>{s}</button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              messages.map(msg => (
-                <div key={msg.id} className={`ai-msg ${msg.role}`}>
-                  {msg.role === 'assistant' && (
-                    <div className="ai-msg-role"><span className="mh-acc">◈</span> assistant</div>
-                  )}
-
-                  {/* Tool calls */}
-                  {msg.toolCalls && msg.toolCalls.length > 0 && (
-                    <div className="ai-tools">
-                      {msg.toolCalls.map((tc, i) => <ToolCard key={i} tool={tc} />)}
-                    </div>
-                  )}
-
-                  {/* Thinking indicator */}
-                  {msg.thinking && (
-                    <div className="ai-thinking">
-                      <span className="ai-thinking-dot" /><span className="ai-thinking-dot" /><span className="ai-thinking-dot" />
-                      <span>{msg.thinking}</span>
-                    </div>
-                  )}
-
-                  {/* Message content */}
-                  {msg.content && (
-                    <div className="ai-msg-content">
-                      {msg.role === 'assistant' ? <Markdown text={msg.content} /> : msg.content}
-                      {msg.streaming && !msg.thinking && <span className="ai-cursor" />}
-                    </div>
-                  )}
-
-                  {msg.streaming && !msg.content && !msg.toolCalls?.length && !msg.thinking && (
-                    <div className="ai-msg-content ai-msg-thinking">
-                      <span className="ai-thinking-dot" /><span className="ai-thinking-dot" /><span className="ai-thinking-dot" />
-                    </div>
-                  )}
-
-                  {/* Action cards */}
-                  {msg.actions && msg.actions.length > 0 && (
-                    <div className="ai-actions">
-                      <div style={{ fontSize: 10, color: 'var(--fg-3)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>
-                        ▸ click to apply in dashboard
-                      </div>
-                      {msg.actions.map((action, i) => (
-                        <ActionCard key={i} action={action} onApply={() => applyAction(action)} />
+            <>
+              {/* Messages body */}
+              <div className="ai-body">
+                {messages.length === 0 ? (
+                  <div className="ai-empty">
+                    <div className="ai-empty-glyph">◈</div>
+                    <div className="ai-empty-title">Analytics AI</div>
+                    <div className="ai-empty-sub">Ask anything about your data</div>
+                    <div className="ai-suggestions">
+                      {SUGGESTIONS.map(s => (
+                        <button key={s} className="ai-suggestion" onClick={() => send(s)}>{s}</button>
                       ))}
                     </div>
-                  )}
-                </div>
-              ))
-            )}
-            <div ref={bottomRef} />
-          </div>
+                  </div>
+                ) : (
+                  messages.map(msg => (
+                    <div key={msg.id} className={`ai-msg ${msg.role}`}>
+                      {msg.role === 'assistant' && (
+                        <div className="ai-msg-role"><span className="mh-acc">◈</span> assistant</div>
+                      )}
+                      {msg.toolCalls && msg.toolCalls.length > 0 && (
+                        <div className="ai-tools">
+                          {msg.toolCalls.map((tc, i) => <ToolCard key={i} tool={tc} />)}
+                        </div>
+                      )}
+                      {msg.thinking && (
+                        <div className="ai-thinking">
+                          <span className="ai-thinking-dot" /><span className="ai-thinking-dot" /><span className="ai-thinking-dot" />
+                          <span>{msg.thinking}</span>
+                        </div>
+                      )}
+                      {msg.content && (
+                        <div className="ai-msg-content">
+                          {msg.role === 'assistant' ? <Markdown text={msg.content} /> : msg.content}
+                          {msg.streaming && !msg.thinking && <span className="ai-cursor" />}
+                        </div>
+                      )}
+                      {msg.streaming && !msg.content && !msg.toolCalls?.length && !msg.thinking && (
+                        <div className="ai-msg-content ai-msg-thinking">
+                          <span className="ai-thinking-dot" /><span className="ai-thinking-dot" /><span className="ai-thinking-dot" />
+                        </div>
+                      )}
+                      {msg.actions && msg.actions.length > 0 && (
+                        <div className="ai-actions">
+                          <div style={{ fontSize: 10, color: 'var(--fg-3)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>
+                            ▸ click to apply in dashboard
+                          </div>
+                          {msg.actions.map((action, i) => (
+                            <ActionCard key={i} action={action} onApply={() => applyAction(action)} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+                <div ref={bottomRef} />
+              </div>
 
-          {/* Input */}
-          <form className="ai-input-wrap" onSubmit={handleSubmit}>
-            <textarea
-              ref={inputRef}
-              className="ai-input"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask about your analytics… (Enter to send)"
-              rows={1}
-              disabled={streaming}
-            />
-            <button type="submit" className="ai-send" disabled={!input.trim() || streaming} title="Send (Enter)">
-              {streaming ? <span className="ai-send-dot" /> : '▸'}
-            </button>
-          </form>
-        </div>
+              {/* Input */}
+              <form className="ai-input-wrap" onSubmit={handleSubmit}>
+                <textarea
+                  ref={inputRef}
+                  className="ai-input"
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask about your analytics… (Enter to send)"
+                  rows={1}
+                  disabled={streaming}
+                />
+                <button type="submit" className="ai-send" disabled={!input.trim() || streaming} title="Send (Enter)">
+                  {streaming ? <span className="ai-send-dot" /> : '▸'}
+                </button>
+              </form>
+            </>
           )}
         </div>
       )}

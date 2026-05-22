@@ -598,7 +598,7 @@ export default function SettingsPage() {
                     OLLAMA_ORIGINS=* ollama serve
                   </code>
                   <button
-                    onClick={() => { navigator.clipboard.writeText('OLLAMA_ORIGINS=* ollama serve'); toast('Copied!'); }}
+                    onClick={() => { navigator.clipboard.writeText('OLLAMA_ORIGINS=* ollama serve'); toast('success', 'Copied!'); }}
                     style={{ padding: '4px 10px', fontSize: 11, border: '1px solid var(--bd)', background: 'transparent', color: 'var(--fg-2)', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
                   >
                     copy
@@ -613,7 +613,7 @@ export default function SettingsPage() {
 
           <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
             <button
-              onClick={() => { setAiSettings(aiSettings); setAiSaved(true); setTimeout(() => setAiSaved(false), 2000); toast('AI settings saved'); }}
+              onClick={() => { setAiSettings(aiSettings); setAiSaved(true); setTimeout(() => setAiSaved(false), 2000); toast('success', 'AI settings saved'); }}
               style={{ padding: '5px 16px', fontSize: 12, border: '1px solid var(--acc)', background: 'transparent', color: 'var(--acc)', cursor: 'pointer', fontFamily: 'inherit' }}
             >
               save
