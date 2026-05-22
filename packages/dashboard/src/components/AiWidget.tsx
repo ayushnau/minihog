@@ -363,11 +363,15 @@ export default function AiWidget() {
   };
 
   const clearChat = async () => {
-    await fetch('/api/ai/stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...aiSettingsToHeaders(getAiSettings()) },
-      credentials: 'include', body: JSON.stringify({ clear: true }),
-    });
+    const s = getAiSettings();
+    if (s.provider !== 'ollama') {
+      await fetch('/api/ai/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...aiSettingsToHeaders(s) },
+        credentials: 'include', body: JSON.stringify({ clear: true }),
+      });
+    }
+    ollamaHistory.current = [];
     setMessages([]);
     setSessionLoaded(false);
   };

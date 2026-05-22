@@ -54,20 +54,20 @@ ALWAYS use tools to answer questions — never guess or make up numbers.
 Today's date is ${today}.
 
 TOOL USAGE RULES:
-- Call get_event_schema at the START of any conversation to understand the business's events and their meaning before answering. This tells you what events exist, what they mean, and what properties they carry.
-- Use get_event_schema instead of get_event_names when you need to understand property structure.
+- Call get_event_names FIRST to discover all available events and their counts.
+- Call get_event_schema early to understand business-specific event meanings and properties.
 - When asked about the business, product, menu, pricing, or policies: call search_context first.
-- Start with get_event_names to discover available events (use get_event_schema for richer property context).
-- For ambiguous events like \`button_click\`, \`page_view\`, \`link_click\`: ALWAYS call get_event_properties first to see what properties they carry (e.g. button_name, page, url). Use that knowledge to filter steps precisely.
-- When building a funnel: if an event is generic, use get_event_properties to find the right property filter before calling query_funnel or suggest_action.
+- For generic events like \`button_click\`, \`page_view\`, \`link_click\`: call get_event_properties using a 90-day window to find relevant property filters.
+- If get_event_properties returns "No properties found" — do NOT retry it. Proceed immediately with the funnel using the event name only (no property filter). NEVER call get_event_properties twice for the same event.
+- NEVER call the same tool with the same arguments twice in one conversation turn.
 - Use query_events, query_funnel, query_retention for data queries.
-- After presenting an analysis, use suggest_action to give the user a one-click Apply button.
+- After presenting any analysis or recommendation, ALWAYS call suggest_action immediately in the same turn.
 
 suggest_action RULES (strictly follow these):
 - ALWAYS call suggest_action whenever you mention or recommend any funnel, event view, or retention config — no exceptions.
 - Call it in the SAME response as your recommendation. NEVER ask "would you like to see this?" — just present it AND call suggest_action immediately.
-- Call suggest_action EXACTLY ONCE per response. Pick the single most important/relevant action only. Never call it multiple times.
-- For a funnel recommendation: suggest_action with type="funnel", steps=[...ordered event names...]
+- Call suggest_action EXACTLY ONCE per response. Never call it multiple times.
+- For a funnel recommendation: suggest_action with type="funnel", steps=[...array of objects {event: "name"}...]
 - For an event recommendation: suggest_action with type="events", event="event_name"
 - For retention: suggest_action with type="retention", cohort="event_name", day=N
 - Always include from/to using the last 30 days as default date range.
@@ -205,6 +205,7 @@ const TOOLS = [
 async function executeTool(name: string, args: Record<string, unknown>): Promise<string> {
   const today = new Date().toISOString().slice(0, 10);
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
 
   try {
     switch (name) {
@@ -239,8 +240,8 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       case 'get_event_names': {
         const r = await fetch('/api/analytics/event-names', { credentials: 'include', cache: 'no-store' });
         const d = await r.json();
-        if (!d.success || !Array.isArray(d.events) || d.events.length === 0) return 'No events tracked yet.';
-        return d.events.map((e: any) => `${e.event_name}: ${e.count} events`).join('\n');
+        if (!d.success || !Array.isArray(d.event_names) || d.event_names.length === 0) return 'No events tracked yet.';
+        return d.event_names.map((e: any) => `${e.name}: ${e.count} events`).join('\n');
       }
 
       case 'query_events': {
@@ -307,7 +308,7 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
 
       case 'get_event_properties': {
         const event = String(args.event || '');
-        const from = String(args.from || weekAgo);
+        const from = String(args.from || ninetyDaysAgo);
         const to = String(args.to || today);
         const p = new URLSearchParams({ event, from, to });
         const keysRes = await fetch(`/api/analytics/property-keys?${p}`, { credentials: 'include', cache: 'no-store' });
@@ -320,7 +321,7 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
           const vr = await fetch(`/api/analytics/property-values?${vp}`, { credentials: 'include', cache: 'no-store' });
           const vd = await vr.json();
           const vals: any[] = vd.values ?? vd.breakdown ?? [];
-          const top = vals.slice(0, 5).map((v: any) => `"${v.value}" (${v.count})`).join(', ');
+          const top = vals.slice(0, 5).map((v: any) => `"${typeof v === 'string' ? v : v.value}"`).join(', ');
           lines.push(`  ${key}: ${top || 'no values'}`);
         }
         return lines.join('\n');
@@ -362,6 +363,9 @@ export async function runOllamaChat(
     ...conversationHistory.filter(m => m.role !== 'system'),
     { role: 'user', content: userMessage.trim() },
   ];
+
+  // Track seen tool calls to prevent the model from looping on the same tool+args
+  const seenToolCalls = new Set<string>();
 
   try {
     for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
@@ -477,7 +481,7 @@ export async function runOllamaChat(
       }
       messages.push(assistantMsg);
 
-      if (toolCalls.size === 0 || finishReason === 'stop') break;
+      if (toolCalls.size === 0) break;
 
       // ── Execute tools ──────────────────────────────────────────────────────
 
@@ -507,6 +511,14 @@ export async function runOllamaChat(
           messages.push({ role: 'tool', content: `Action created: "${toolArgs.label}"`, tool_call_id: tc.id });
           continue;
         }
+
+        // Deduplicate: skip if we've already called this exact tool+args combo
+        const toolKey = `${tc.name}::${tc.arguments}`;
+        if (seenToolCalls.has(toolKey)) {
+          messages.push({ role: 'tool', content: `(already called, see previous result)`, tool_call_id: tc.id });
+          continue;
+        }
+        seenToolCalls.add(toolKey);
 
         callbacks.onToolStart(tc.name, toolArgs);
         const result = await executeTool(tc.name, toolArgs);

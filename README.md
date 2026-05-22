@@ -1,510 +1,242 @@
+<img src="https://raw.githubusercontent.com/ayushnautiyal/minihog/refs/heads/main/.github/banner.png" alt="MiniHog Banner" width="100%" />
+
+<div align="center">
+
 # MiniHog
 
-A PostHog-inspired analytics and attribution engine built with Node.js, PostgreSQL, and TypeScript.
+**Self-hosted product analytics & attribution — built for makers who want full control.**
 
-MiniHog is a lightweight analytics backend focused on event ingestion, analytics primitives, and attribution. It demonstrates production-style systems engineering with a clean, well-organized codebase.
+[![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/built%20with-TypeScript-3178c6.svg)](https://www.typescriptlang.org)
+[![Node.js](https://img.shields.io/badge/runtime-Node.js%2018%2B-339933.svg)](https://nodejs.org)
+[![PostgreSQL](https://img.shields.io/badge/database-PostgreSQL-4169e1.svg)](https://postgresql.org)
 
-## 📚 Documentation
+[Live Demo](https://dashboard-two-bice-3g9ewrov9e.vercel.app) · [Analytics Docs](./docs/ANALYTICS.md) · [Deploy Guide](./docs/deployment/QUICK_DEPLOY.md)
 
-All documentation is organized in the [`docs/`](./docs/) folder:
+</div>
 
-- **[Setup Guide](./docs/setup/SETUP.md)** - Local development setup
-- **[Deployment Guides](./docs/deployment/)** - Deploy to Vercel, Supabase, etc.
-- **[Troubleshooting](./docs/troubleshooting/)** - Common issues and solutions
+---
 
-Quick links:
-- [Quick Deploy](./docs/deployment/QUICK_DEPLOY.md)
-- [Vercel + Supabase Setup](./docs/deployment/DEPLOY_VERCEL_SUPABASE.md)
-- [CORS Configuration](./docs/troubleshooting/CORS_SETUP.md)
+## What is MiniHog?
 
-## 🏗️ Architecture
+MiniHog is a **PostHog-inspired, open-source analytics platform** you can host yourself. It tracks user events from any web app, visualises funnels and retention, attributes installs to marketing campaigns, and now ships with an **AI assistant** you can point at your own Gemini key or local Ollama model.
+
+No data leaves your infrastructure. No per-event pricing. No vendor lock-in.
+
+---
+
+## Features
+
+### Event Tracking
+Drop in the SDK, call `track()`, and every user action lands in your own PostgreSQL database. Events batch automatically, retry on failure, and flush on page unload.
+
+### Funnel Analysis
+Define any multi-step conversion path and instantly see where users drop off — with exact user counts and drop-off percentages at every step. Property filters let you narrow to specific button labels, page URLs, or any custom property.
+
+### Retention Cohorts
+See what percentage of users who did action A came back and did action B on day N. The heatmap view shows all cohort dates at once so you can spot trends over time.
+
+### Last-Click Attribution
+Every ad click is recorded with a `device_id`. When an install follows within the attribution window (default 24h), MiniHog links it back to the originating campaign — no mobile SDK required.
+
+### AI Analytics Assistant
+Ask questions about your data in plain English. The assistant calls your real live data (funnels, retention, event counts) and surfaces insights with one-click **Apply** buttons that pre-fill the dashboard. Works with:
+- **Google Gemini** — enter your API key in Settings
+- **Local Ollama** — runs entirely in your browser, data never leaves your machine
+
+### Live Event Stream
+Watch events flow in real-time on the Overview page. See which users are active right now and what they're doing.
+
+### Full Dashboard
+- Overview KPIs with sparklines
+- Per-event time series with property breakdown
+- Funnel builder with drag-to-reorder steps
+- Retention heatmap
+- Campaign attribution pie charts
+- API key management with soft-delete revocation
+
+---
+
+## Architecture
 
 ```
-┌─────────────────┐         ┌──────────────────────────────────────────┐
-│   Client App    │         │           Dashboard (Next.js)            │
-│   (Browser)     │         │  React + Tailwind + shadcn-ui + Recharts │
-└────────┬────────┘         └──────────────────┬───────────────────────┘
-         │ JS SDK                              │ API Proxy (JWT Auth)
-         │ (track, flush)                      │
-         v                                     v
+┌─────────────────┐         ┌─────────────────────────────────────────┐
+│   Your App      │         │        Dashboard  (Next.js 14)          │
+│                 │         │  Auth · Funnel · Retention · Attribution │
+│  minihog-sdk    │         │  AI Assistant (Gemini / Ollama)         │
+└────────┬────────┘         └──────────────────┬──────────────────────┘
+         │ POST /track/batch                   │ JWT cookie
+         │ X-API-Key header                    │
+         ▼                                     ▼
 ┌──────────────────────────────────────────────────────────┐
-│                   Backend API (Express)                   │
+│                   Backend API  (Express)                  │
 │                                                          │
-│  ┌──────────┐  ┌────────────┐  ┌───────────────────────┐ │
-│  │ Ingestion│  │    Auth     │  │   Analytics Engine    │ │
-│  │ /track   │  │ /api/auth   │  │ events, funnel,       │ │
-│  │ /click   │  │ JWT + Keys  │  │ retention, attribution│ │
-│  │ /install │  │             │  │ timeseries, journeys  │ │
-│  └────┬─────┘  └─────┬──────┘  └──────────┬────────────┘ │
-│       │              │                     │              │
-│       v              v                     v              │
-│  ┌──────────────────────────────────────────────┐        │
-│  │          Prisma ORM + PostgreSQL              │        │
-│  │  Events | Clicks | Installs | Users | ApiKeys │        │
-│  └──────────────────────────────────────────────┘        │
+│  Ingestion          Auth / Keys        Analytics Engine  │
+│  /track /click      JWT + API Keys     events, funnel,   │
+│  /install           bcrypt             retention,         │
+│                                        attribution, AI   │
+│                                                          │
+│            Prisma ORM  ──►  PostgreSQL                   │
+│      events · clicks · installs · users · api_keys       │
 └──────────────────────────────────────────────────────────┘
 ```
 
-### Event Ingestion Flow
+### Event Ingestion
 
 ```
-Client App                        SDK                           API                         PostgreSQL
-   │                               │                             │                              │
-   │  MiniHog.track(event, props)  │                             │                              │
-   │──────────────────────────────>│                             │                              │
-   │                               │  (queue event locally)      │                              │
-   │                               │──────┐                      │                              │
-   │                               │      │ batch full /         │                              │
-   │                               │<─────┘ flush interval /     │                              │
-   │                               │        page unload          │                              │
-   │                               │                             │                              │
-   │                               │  POST /track/batch          │                              │
-   │                               │  X-API-Key: <key>           │                              │
-   │                               │────────────────────────────>│                              │
-   │                               │                             │  Validate API key            │
-   │                               │                             │─────────────────────────────>│
-   │                               │                             │  Idempotency check           │
-   │                               │                             │─────────────────────────────>│
-   │                               │                             │  Batch insert events         │
-   │                               │                             │─────────────────────────────>│
-   │                               │                             │                              │
-   │                               │         200 OK              │                              │
-   │                               │<────────────────────────────│                              │
+Your App          SDK (browser)             Backend API         PostgreSQL
+   │                   │                        │                   │
+   │  .track(evt,props)│                        │                   │
+   │──────────────────>│                        │                   │
+   │                   │  buffer in memory      │                   │
+   │                   │  (batch ≥10 or 5s)     │                   │
+   │                   │  POST /track/batch     │                   │
+   │                   │  X-API-Key: <key>      │                   │
+   │                   │───────────────────────>│                   │
+   │                   │                        │  validate key     │
+   │                   │                        │──────────────────>│
+   │                   │                        │  batch INSERT     │
+   │                   │                        │──────────────────>│
+   │                   │        200 OK          │                   │
+   │                   │<───────────────────────│                   │
 ```
 
-### Attribution Flow (Last-Click)
+### Analytics Query
 
 ```
-1. Click recorded:     POST /click { device_id, campaign_id, timestamp }
-                         │
-                         v
-                       Clicks table stores the click
-                         
-2. Install recorded:   POST /install { device_id, timestamp }
-                         │
-                         v
-                       Attribution Engine runs:
-                         │
-                         ├── Query all clicks for this device_id
-                         │   within the attribution window (default 24h)
-                         │
-                         ├── Select the most recent click (last-click model)
-                         │
-                         └── Store attributed_campaign_id with the install
-
-3. Subsequent events:  Events can carry the attributed_campaign_id
-                       for campaign performance analysis
+Browser           Dashboard (Next.js)         Backend API         PostgreSQL
+   │                    │                          │                   │
+   │  view Funnel page  │                          │                   │
+   │───────────────────>│                          │                   │
+   │                    │  GET /api/analytics/     │                   │
+   │                    │  funnel?steps=...        │                   │
+   │                    │  (auth-token cookie)     │                   │
+   │                    │─────────────────────────>│                   │
+   │                    │                          │  validate JWT     │
+   │                    │                          │  extract userId   │
+   │                    │                          │  funnel query     │
+   │                    │                          │──────────────────>│
+   │                    │                          │  step counts +    │
+   │                    │                          │  drop-off %       │
+   │                    │                          │<──────────────────│
+   │                    │       JSON response      │                   │
+   │                    │<─────────────────────────│                   │
+   │  funnel chart      │                          │                   │
+   │<───────────────────│                          │                   │
 ```
 
-### Dashboard Authentication Flow
+### Attribution (Last-Click)
 
 ```
-Browser                     Dashboard (Next.js)              Backend API
-   │                              │                              │
-   │  POST /signin                │                              │
-   │  { username, password }      │                              │
-   │─────────────────────────────>│                              │
-   │                              │  POST /api/auth/login        │
-   │                              │─────────────────────────────>│
-   │                              │                              │  Verify credentials
-   │                              │                              │  Issue JWT (HS256)
-   │                              │     Set auth-token cookie    │
-   │                              │<─────────────────────────────│
-   │  Set HTTP-only cookie        │                              │
-   │<─────────────────────────────│                              │
-   │                              │                              │
-   │  GET /dashboard              │                              │
-   │─────────────────────────────>│                              │
-   │                              │  GET /api/analytics/events   │
-   │                              │  (forwards JWT cookie)       │
-   │                              │─────────────────────────────>│
-   │                              │                              │  Validate JWT
-   │                              │                              │  Fetch user's API keys
-   │                              │                              │  Query events filtered
-   │                              │                              │  by userId/apiKeyIds
-   │                              │       Analytics data         │
-   │                              │<─────────────────────────────│
-   │     Rendered dashboard       │                              │
-   │<─────────────────────────────│                              │
+Ad Network  →  POST /click { device_id, campaign_id }  →  clicks table
+                                                              │
+App Install →  POST /install { device_id }                   │
+                    │                                         │
+                    └── find latest click within 24h window ─┘
+                              │
+                              ▼
+                    installs table (attributed_campaign_id)
+                    events table   (install event)
 ```
 
-## 📦 Monorepo Structure
+---
 
-This project uses [Turborepo](https://turbo.build/) for monorepo management:
-
-```
-minihog/
-├── packages/
-│   ├── api/          # Backend API (Express + Prisma + PostgreSQL)
-│   ├── dashboard/    # Next.js Dashboard (React + Tailwind)
-│   └── sdk/          # JavaScript SDK (npm package)
-├── docs/             # Documentation
-│   ├── deployment/   # Deployment guides
-│   ├── setup/        # Setup guides
-│   └── troubleshooting/ # Troubleshooting guides
-├── scripts/          # Utility scripts
-├── turbo.json        # Turborepo configuration
-└── package.json      # Root workspace configuration
-```
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
-- Node.js 18+ 
-- PostgreSQL 12+ (or use Supabase)
-- npm or yarn
+- Node.js 18+
+- PostgreSQL 14+ (or [Supabase](https://supabase.com) free tier)
 
-### Quick Setup
-
-See the [Setup Guide](./docs/setup/SETUP.md) for detailed instructions.
-
-**TL;DR:**
+### Local Setup
 
 ```bash
-# 1. Install dependencies
+git clone https://github.com/ayushnautiyal/minihog
+cd minihog
 npm install
 
-# 2. Set up database (PostgreSQL/Supabase)
-# See docs/setup/SETUP.md or docs/deployment/SUPABASE_SETUP.md
+# Configure environment
+cp packages/api/.env.example packages/api/.env
+cp packages/dashboard/.env.example packages/dashboard/.env.local
+# → fill in DATABASE_URL and JWT_SECRET (must match in both)
 
-# 3. Configure environment variables
-cd packages/api
-# Create .env with DATABASE_URL
+# Push schema
+cd packages/api && npx prisma db push && cd ../..
+cd packages/dashboard && npx prisma db push && cd ../..
 
-# 4. Run migrations
-npx prisma migrate deploy
-npx prisma generate
-
-# 5. Start development
+# Start everything
 npm run dev
+# API  → http://localhost:3000
+# Dashboard → http://localhost:3002
 ```
 
-The API will be available at `http://localhost:3000`  
-The Dashboard will be available at `http://localhost:3002`
-
-## 📚 API Endpoints
-
-### Authentication
-
-All event ingestion and analytics endpoints require an API key via one of:
-- `X-API-Key` header
-- `Authorization: Bearer <key>` header
-- `?api_key=<key>` query parameter
-
-Dashboard endpoints require JWT authentication via the `auth-token` cookie.
-
-### Event Ingestion
-
-**POST `/track`** - Track a user event
-
-```json
-{
-  "event": "purchase",
-  "distinct_id": "user_123",
-  "timestamp": 1706352000000,
-  "properties": {
-    "amount": 299,
-    "currency": "INR"
-  }
-}
-```
-
-**POST `/click`** - Record a marketing click (for attribution)
-
-```json
-{
-  "device_id": "device_abc",
-  "campaign_id": "INSTAGRAM_12",
-  "timestamp": 1706351800000
-}
-```
-
-**POST `/install`** - Record an install event (triggers attribution)
-
-```json
-{
-  "device_id": "device_abc",
-  "timestamp": 1706352000000
-}
-```
-
-### Analytics Queries
-
-**GET `/analytics/events?event=purchase&from=2026-01-01&to=2026-01-07`**
-
-Returns total event count and unique users.
-
-**GET `/analytics/funnel?steps=install,signup,purchase&from=2026-01-01&to=2026-01-07`**
-
-Returns funnel analysis with drop-off percentages.
-
-**GET `/analytics/retention?cohort=install&day=7&from=2026-01-01&to=2026-01-07`**
-
-Returns retention percentage (users who returned after N days).
-
-**GET `/analytics/attribution`**
-
-Returns attribution analytics (installs and purchases per campaign).
-
-### Dashboard Analytics (JWT Required)
-
-**GET `/dashboard/analytics/events`** - Comprehensive event analytics with optional params:
-- `include_time_series=true` - Include time series data
-- `include_properties=true` - Include properties breakdown
-- `include_journeys=true` - Include user journeys
-- `property_key=page` - Property key to break down by
-- `granularity=day|hour` - Time series granularity
-
-**GET `/dashboard/analytics/funnel`** - User-scoped funnel analysis
-
-**GET `/dashboard/analytics/retention`** - User-scoped retention analysis
-
-**GET `/dashboard/analytics/attribution`** - User-scoped attribution data
-
-### Auth & Key Management
-
-- **POST `/api/auth/register`** - Create account
-- **POST `/api/auth/login`** - Login (returns JWT in `auth-token` cookie)
-- **POST `/api/auth/logout`** - Clear auth token
-- **GET `/api/auth/me`** - Current user profile
-- **POST `/api/auth/change-password`** - Update password
-- **POST `/api/keys`** - Generate new API key
-- **GET `/api/keys`** - List user's API keys
-- **DELETE `/api/keys?id={id}`** - Revoke an API key
-
-## 📦 JavaScript SDK
-
-### Installation
+### SDK Integration
 
 ```bash
 npm install minihog-sdk
 ```
 
-### Usage
-
 ```javascript
 import MiniHog from 'minihog-sdk';
 
-// Initialize with environment (no need to specify endpoint)
 MiniHog.init({
-  environment: 'production', // or 'sandbox' or 'development'
-  apiKey: 'your-api-key', // Required
-  batchSize: 10,
-  flushInterval: 5000,
+  apiKey: 'your-api-key',   // generate one in the dashboard
+  environment: 'production', // or 'development' for localhost
 });
 
-// Track page views (for user behavior analysis)
-MiniHog.track('page_view', { page: '/home' });
-MiniHog.track('page_view', { page: '/pricing' });
-
-// Track button clicks with button IDs and page context
-MiniHog.track('button_click', { 
-  page: '/home',
-  button_id: 'signup-btn',
-  button_name: 'signup',
-  button_text: 'Sign Up Now'
-});
-
-// Track other interactive events (form submissions, link clicks, etc.)
-MiniHog.track('form_submit', { 
-  page: '/contact',
-  form_id: 'contact-form',
-  form_name: 'Contact Form'
-});
-
-MiniHog.track('link_click', { 
-  page: '/blog',
-  link_id: 'read-more-link',
-  link_url: '/blog/article-1',
-  link_text: 'Read More'
-});
-
-// Track conversions with page and event context
-MiniHog.track('signup', { page: '/signup', plan: 'premium' });
-MiniHog.track('purchase', { page: '/checkout', amount: 299, currency: 'INR' });
-
-// Manually flush (events are auto-flushed on interval or page unload)
-MiniHog.flush();
+MiniHog.track('page_view',    { page: '/home' });
+MiniHog.track('button_click', { page: '/pricing', button_id: 'cta-buy' });
+MiniHog.track('purchase',     { amount: 299, currency: 'USD' });
 ```
 
-📦 **Published on npm**: [minihog-sdk](https://www.npmjs.com/package/minihog-sdk) | [Package Access](https://www.npmjs.com/package/minihog-sdk/access)
+Events batch automatically (10 at a time or every 5 seconds) and flush on page unload.
 
-See [packages/sdk/README.md](./packages/sdk/README.md) for full documentation.
+---
 
-### SDK Features
+## Deploy to Vercel + Supabase
 
-- **Automatic batching** - Events are batched before sending
-- **Retry logic** - Failed requests are retried with exponential backoff
-- **Session management** - Distinct IDs are generated and persisted
-- **Auto-flush** - Events are flushed on page unload or interval
-- **Flexible event tracking** - Track page views, button clicks, form submissions, link clicks, and any custom events
-- **Rich context** - Include page paths, button IDs, form IDs, and other contextual information with all events
+See the [full deployment guide](./docs/deployment/DEPLOY_VERCEL_SUPABASE.md).
 
-## 🎯 Attribution Logic
-
-MiniHog uses **last-click attribution**:
-
-1. When an install event is recorded, the system looks for clicks from the same `device_id`
-2. Clicks within the attribution window (default: 24 hours) are considered
-3. The most recent click's `campaign_id` is assigned to the install
-4. The attributed campaign is stored with the install and subsequent events
-
-The attribution window is configurable via `ATTRIBUTION_WINDOW_HOURS` environment variable.
-
-## 🗄️ Database Schema
-
-### Events Table
-- `id` (UUID, PK)
-- `event_name` (String)
-- `distinct_id` (String)
-- `timestamp` (DateTime)
-- `properties` (JSON)
-- `attributed_campaign_id` (String, nullable)
-- `api_key_id` (String, nullable) - Links event to API key
-- `user_id` (String, nullable) - Links event to dashboard user
-
-**Indexes:** `(event_name, timestamp)`, `(user_id, event_name, timestamp)`, `(api_key_id, event_name, timestamp)`, `distinct_id`, `timestamp`, `api_key_id`, `user_id`
-
-### Clicks Table
-- `id` (UUID, PK)
-- `device_id` (String)
-- `campaign_id` (String)
-- `timestamp` (DateTime)
-
-**Indexes:** `(device_id, timestamp)`, `campaign_id`
-
-### Installs Table
-- `id` (UUID, PK)
-- `device_id` (String)
-- `install_time` (DateTime)
-- `attributed_campaign_id` (String, nullable)
-
-**Indexes:** `device_id`, `attributed_campaign_id`, `install_time`
-
-### Users Table
-- `id` (UUID, PK)
-- `username` (String, unique)
-- `email` (String, unique)
-- `password_hash` (String)
-- `created_at` (DateTime)
-- `updated_at` (DateTime)
-
-### API Keys Table
-- `id` (UUID, PK)
-- `user_id` (String, FK -> Users)
-- `key` (String, unique)
-- `name` (String)
-- `last_used` (DateTime, nullable)
-- `deleted_at` (DateTime, nullable) - Soft delete for revocation
-
-**Indexes:** `user_id`, `key`, `deleted_at`
-
-## 🧪 Testing
+**TL;DR:**
 
 ```bash
-# Test API endpoints (API key required)
-curl -X POST http://localhost:3000/track \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key" \
-  -d '{"event":"test","distinct_id":"user_1","properties":{}}'
+# Deploy API
+vercel --cwd packages/api --prod
 
-# Test click tracking (no auth required)
-curl -X POST http://localhost:3000/click \
-  -H "Content-Type: application/json" \
-  -d '{"device_id":"device_1","campaign_id":"campaign_1","timestamp":1706351800000}'
-
-# Test analytics query
-curl "http://localhost:3000/analytics/events?event=test&from=2026-01-01&to=2026-12-31" \
-  -H "X-API-Key: your-api-key"
+# Deploy Dashboard
+vercel --cwd packages/dashboard --prod
 ```
 
-## 🛠️ Development
+Set environment variables in the Vercel dashboard for each project. Use Supabase's **connection pooler URL** (port 6543) for `DATABASE_URL`.
 
-### Build all packages
+---
 
-```bash
-npm run build
-```
+## Documentation
 
-### Run in development mode
+| Doc | What's inside |
+|-----|--------------|
+| [Analytics Logic](./docs/ANALYTICS.md) | How events, funnels, retention, and attribution are calculated |
+| [Setup Guide](./docs/setup/SETUP.md) | Local development setup |
+| [Deployment Guide](./docs/deployment/DEPLOY_VERCEL_SUPABASE.md) | Vercel + Supabase production deploy |
+| [Troubleshooting](./docs/troubleshooting/CORS_SETUP.md) | CORS and common issues |
 
-```bash
-npm run dev
-```
+---
 
-### Database management
+## Tech Stack
 
-```bash
-cd packages/api
+| Layer | Technology |
+|-------|-----------|
+| SDK | Vanilla TypeScript, zero dependencies |
+| API | Express.js, Prisma ORM, Zod validation |
+| Dashboard | Next.js 14 (App Router), React 18, Tailwind CSS |
+| Charts | Recharts |
+| Auth | JWT (jose) + bcryptjs |
+| Database | PostgreSQL (Supabase in production) |
+| Monorepo | Turborepo + npm workspaces |
+| AI | Google Gemini API / Ollama (local) |
 
-# Generate Prisma client
-npm run db:generate
+---
 
-# Run migrations
-npm run db:migrate
+## License
 
-# Open Prisma Studio (database GUI)
-npm run db:studio
-```
-
-## 📝 Design Decisions & Tradeoffs
-
-### Why Turborepo?
-
-- **Monorepo benefits**: Shared types, easier development, atomic changes
-- **Turborepo**: Fast builds with intelligent caching, simple configuration
-
-### Why Prisma?
-
-- **Type safety**: Auto-generated TypeScript types from schema
-- **Developer experience**: Great migrations, Prisma Studio for debugging
-- **Performance**: Efficient queries with proper indexing
-
-### Why PostgreSQL?
-
-- **JSON support**: Native JSONB for flexible event properties
-- **Reliability**: ACID compliance for analytics correctness
-- **Indexing**: Efficient queries on time-series data
-- **Supabase integration**: Easy deployment and scaling
-- **Type safety**: Better type support than MySQL
-
-### Why Express?
-
-- **Simplicity**: Minimal framework, easy to understand
-- **Flexibility**: Easy to add middleware, custom logic
-- **Mature**: Well-documented, widely used
-
-### Attribution Window
-
-- **Configurable**: Set via environment variable
-- **Default 24h**: Industry standard for mobile attribution
-- **Last-click**: Simple, explainable model (can be extended)
-
-### SDK Batching
-
-- **Reduces API calls**: Better performance, lower server load
-- **Configurable batch size**: Balance between latency and efficiency
-- **Auto-flush**: Ensures events aren't lost on page unload
-
-## 🚧 Future Enhancements (Out of Scope)
-
-- Feature flags
-- Session replay
-- Multi-touch attribution models
-- ClickHouse / Kafka for scale
-- Real-time dashboards
-- Mobile SDKs
-
-## 📄 License
-
-MIT
-
-## 🤝 Contributing
-
-This is a demonstration project. Contributions welcome for:
-- Bug fixes
-- Performance improvements
-- Additional analytics queries
-- SDK enhancements
-
+MIT — use it, fork it, ship it.

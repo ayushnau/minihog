@@ -113,7 +113,7 @@ export default function FunnelPage() {
     count: s.users,
   })) ?? [];
 
-  const overallConv = data && data.funnel.length > 1
+  const overallConv = data && data.funnel.length > 1 && (data.funnel[0].users ?? 0) > 0
     ? ((data.funnel[data.funnel.length - 1].users / data.funnel[0].users) * 100).toFixed(1)
     : null;
 
@@ -251,7 +251,7 @@ export default function FunnelPage() {
                   <tbody>
                     {data.funnel.map((s, i) => {
                       const prev = i > 0 ? data.funnel[i - 1].users : s.users;
-                      const conv = i > 0 ? ((s.users / prev) * 100).toFixed(1) : '100.0';
+                      const conv = i > 0 ? (prev > 0 ? ((s.users / prev) * 100).toFixed(1) : '0.0') : '100.0';
                       return (
                         <tr key={s.step}>
                           <td className="dim">#{s.step}</td>
@@ -260,8 +260,8 @@ export default function FunnelPage() {
                           <td className="num" style={{ color: 'var(--fg-hi)', fontWeight: 700 }}>
                             {s.users.toLocaleString('en-US')}
                           </td>
-                          <td className="num" style={{ color: s.drop_off_percentage > 0 ? 'var(--bad)' : 'var(--fg-3)' }}>
-                            {s.drop_off_percentage > 0 ? `↓ ${s.drop_off_percentage.toFixed(1)}%` : '—'}
+                          <td className="num" style={{ color: (s.drop_off_percentage ?? 0) > 0 ? 'var(--bad)' : 'var(--fg-3)' }}>
+                            {(s.drop_off_percentage ?? 0) > 0 ? `↓ ${(s.drop_off_percentage ?? 0).toFixed(1)}%` : '—'}
                           </td>
                           <td className="num" style={{ color: Number(conv) > 70 ? 'var(--acc)' : 'var(--fg)' }}>
                             {conv}%
