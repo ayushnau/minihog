@@ -2,8 +2,9 @@
 
 generator client {
   provider = "prisma-client-js"
-  // Generate into this package's node_modules so Vercel (Root Directory = packages/dashboard) finds the client
-  output   = "node_modules/.prisma/client"
+  // 3 levels up from packages/dashboard/prisma/ → repo root node_modules
+  // npm workspaces hoists @prisma/client to root node_modules on Netlify
+  output   = "../../../node_modules/.prisma/client"
 }
 
 datasource db {
