@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { getAiSettings, isAiConfigured, aiSettingsToHeaders } from '@/lib/aiSettings';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -178,6 +179,7 @@ export default function AiWidget() {
   const [streaming, setStreaming] = useState(false);
   const [docCount, setDocCount] = useState(0);
   const [sessionLoaded, setSessionLoaded] = useState(false);
+  const [configured, setConfigured] = useState(true);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -188,8 +190,10 @@ export default function AiWidget() {
 
   useEffect(() => {
     if (open) {
+      const s = getAiSettings();
+      setConfigured(isAiConfigured(s));
       setTimeout(() => inputRef.current?.focus(), 80);
-      if (!sessionLoaded) loadSession();
+      if (!sessionLoaded && isAiConfigured(s)) loadSession();
     }
   }, [open]);
 
@@ -235,9 +239,10 @@ export default function AiWidget() {
     setStreaming(true);
 
     try {
+      const aiCfg = getAiSettings();
       const res = await fetch('/api/ai/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...aiSettingsToHeaders(aiCfg) },
         credentials: 'include',
         body: JSON.stringify({ message: text.trim() }),
       });
@@ -332,7 +337,8 @@ export default function AiWidget() {
 
   const clearChat = async () => {
     await fetch('/api/ai/stream', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...aiSettingsToHeaders(getAiSettings()) },
       credentials: 'include', body: JSON.stringify({ clear: true }),
     });
     setMessages([]);
@@ -379,7 +385,25 @@ export default function AiWidget() {
             </div>
           </div>
 
-          {/* Messages body */}
+          {/* Not configured — setup prompt */}
+          {!configured ? (
+            <div className="ai-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '32px 24px', textAlign: 'center' }}>
+              <div style={{ fontSize: 28, color: 'var(--fg-3)' }}>◈</div>
+              <div style={{ fontSize: 13, color: 'var(--fg-hi)', fontWeight: 600 }}>AI provider not configured</div>
+              <div style={{ fontSize: 11.5, color: 'var(--fg-3)', lineHeight: 1.6, maxWidth: 260 }}>
+                Set up Gemini or Ollama in Settings to start using the AI assistant.
+              </div>
+              <a
+                href="/settings"
+                onClick={() => setOpen(false)}
+                style={{ marginTop: 8, padding: '6px 18px', fontSize: 12, border: '1px solid var(--acc)', color: 'var(--acc)', textDecoration: 'none', letterSpacing: '.05em' }}
+              >
+                open settings →
+              </a>
+            </div>
+          ) : (
+
+          /* Messages body */
           <div className="ai-body">
             {messages.length === 0 ? (
               <div className="ai-empty">
@@ -461,6 +485,8 @@ export default function AiWidget() {
               {streaming ? <span className="ai-send-dot" /> : '▸'}
             </button>
           </form>
+        </div>
+          )}
         </div>
       )}
     </>

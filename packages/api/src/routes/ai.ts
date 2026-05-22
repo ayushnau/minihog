@@ -11,30 +11,28 @@ export const aiRouter = Router();
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
-const AI_PROVIDER = (process.env.AI_PROVIDER || 'ollama') as 'ollama' | 'gemini';
 const MAX_ITERATIONS = 8;
-
-// Ollama
-const OLLAMA_BASE = process.env.OLLAMA_URL || 'http://localhost:11434';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen3:8b';
-
-// Gemini (OpenAI-compatible endpoint)
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 const GEMINI_CHAT_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
-function getChatConfig(): { url: string; headers: Record<string, string>; model: string } {
-  if (AI_PROVIDER === 'gemini') {
+// Per-request config: reads from x-ai-* headers first, falls back to env vars
+function getChatConfig(req: Request): { url: string; headers: Record<string, string>; model: string } {
+  const provider = (req as any).headers['x-ai-provider'] || process.env.AI_PROVIDER || 'ollama';
+  if (provider === 'gemini') {
+    const key   = (req as any).headers['x-ai-gemini-key']   || process.env.GEMINI_API_KEY   || '';
+    const model = (req as any).headers['x-ai-gemini-model'] || process.env.GEMINI_MODEL      || 'gemini-2.0-flash';
     return {
       url: GEMINI_CHAT_URL,
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GEMINI_API_KEY}` },
-      model: GEMINI_MODEL,
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      model,
     };
   }
+  // ollama
+  const base  = (req as any).headers['x-ai-ollama-url']   || process.env.OLLAMA_URL   || 'http://localhost:11434';
+  const model = (req as any).headers['x-ai-ollama-model'] || process.env.OLLAMA_MODEL || 'qwen3:8b';
   return {
-    url: `${OLLAMA_BASE}/v1/chat/completions`,
+    url: `${base}/v1/chat/completions`,
     headers: { 'Content-Type': 'application/json' },
-    model: OLLAMA_MODEL,
+    model,
   };
 }
 
@@ -447,8 +445,9 @@ aiRouter.post('/chat/stream', async (req: Request, res: Response) => {
 
   let fullText = '';
 
-  const chat = getChatConfig();
-  console.log(`[AI] provider=${AI_PROVIDER} model=${chat.model}`);
+  const chat = getChatConfig(req);
+  const provider = (req as any).headers['x-ai-provider'] || process.env.AI_PROVIDER || 'ollama';
+  console.log(`[AI] provider=${provider} model=${chat.model}`);
 
   try {
     for (let iter = 0; iter < MAX_ITERATIONS; iter++) {

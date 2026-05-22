@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/useAuth';
 import { Panel, AsciiHr, ToastHost, toast } from '@/components/terminal';
 import { getDefaultDateRange, setDefaultDateRange, type DefaultDateRange } from '@/lib/settings';
 import { invalidateEventSchemaCache } from '@/lib/useEventSchema';
+import { getAiSettings, setAiSettings, type AiSettings, type AiProvider, AI_DEFAULTS } from '@/lib/aiSettings';
 
 const ACCENTS = [
   { id: 'phosphor', label: 'Phosphor', color: '#4ade80', value: '' },
@@ -67,6 +68,10 @@ export default function SettingsPage() {
   const [currentTheme, setCurrentTheme] = useState('');
   const [currentAccent, setCurrentAccent] = useState('');
 
+  // AI Provider settings
+  const [aiSettings, setAiSettingsState] = useState<AiSettings>(AI_DEFAULTS);
+  const [aiSaved, setAiSaved] = useState(false);
+
   // Event Schema state
   const [customEvents, setCustomEvents] = useState<EventSchemaDef[]>([]);
   const [schemasLoading, setSchemasLoading] = useState(true);
@@ -83,6 +88,7 @@ export default function SettingsPage() {
     const accent = document.documentElement.getAttribute('data-accent') || '';
     setCurrentTheme(theme);
     setCurrentAccent(accent);
+    setAiSettingsState(getAiSettings());
     loadDocs();
     loadSchemas();
   }, []);
@@ -492,6 +498,127 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
+          </div>
+        </Panel>
+
+        <AsciiHr label="ai provider" />
+
+        <Panel title="AI Provider" meta={aiSettings.provider === 'none' ? 'not configured' : aiSettings.provider} style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11.5, color: 'var(--fg-3)', marginBottom: 16, lineHeight: 1.6 }}>
+            Configure which AI provider powers the assistant widget. Settings are stored locally in your browser.
+          </div>
+
+          {/* Provider selector */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 8 }}>Provider</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['none', 'gemini', 'ollama'] as AiProvider[]).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setAiSettingsState(s => ({ ...s, provider: p }))}
+                  style={{
+                    padding: '5px 14px', fontSize: 12, border: '1px solid var(--bd)',
+                    background: aiSettings.provider === p ? 'var(--acc)' : 'transparent',
+                    color: aiSettings.provider === p ? '#000' : 'var(--fg)',
+                    cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '.05em',
+                  }}
+                >
+                  {p === 'none' ? 'None' : p === 'gemini' ? 'Gemini' : 'Ollama'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Gemini config */}
+          {aiSettings.provider === 'gemini' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>API Key</label>
+                <input
+                  type="password"
+                  value={aiSettings.geminiKey}
+                  onChange={e => setAiSettingsState(s => ({ ...s, geminiKey: e.target.value }))}
+                  placeholder="AIza..."
+                  style={{ width: '100%', maxWidth: 400, padding: '6px 10px', fontSize: 12, background: 'var(--bg-2)', border: '1px solid var(--bd)', color: 'var(--fg)', fontFamily: 'inherit' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>Model</label>
+                <input
+                  type="text"
+                  value={aiSettings.geminiModel}
+                  onChange={e => setAiSettingsState(s => ({ ...s, geminiModel: e.target.value }))}
+                  placeholder="gemini-2.0-flash"
+                  style={{ width: '100%', maxWidth: 300, padding: '6px 10px', fontSize: 12, background: 'var(--bg-2)', border: '1px solid var(--bd)', color: 'var(--fg)', fontFamily: 'inherit' }}
+                />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                Get a free key at{' '}
+                <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--acc)' }}>
+                  aistudio.google.com/apikey
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Ollama config */}
+          {aiSettings.provider === 'ollama' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>Ollama Server URL</label>
+                <input
+                  type="text"
+                  value={aiSettings.ollamaUrl}
+                  onChange={e => setAiSettingsState(s => ({ ...s, ollamaUrl: e.target.value }))}
+                  placeholder="http://localhost:11434"
+                  style={{ width: '100%', maxWidth: 400, padding: '6px 10px', fontSize: 12, background: 'var(--bg-2)', border: '1px solid var(--bd)', color: 'var(--fg)', fontFamily: 'inherit' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 10.5, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 6 }}>Model</label>
+                <input
+                  type="text"
+                  value={aiSettings.ollamaModel}
+                  onChange={e => setAiSettingsState(s => ({ ...s, ollamaModel: e.target.value }))}
+                  placeholder="qwen3:8b"
+                  style={{ width: '100%', maxWidth: 300, padding: '6px 10px', fontSize: 12, background: 'var(--bg-2)', border: '1px solid var(--bd)', color: 'var(--fg)', fontFamily: 'inherit' }}
+                />
+              </div>
+
+              {/* Ollama CORS helper */}
+              <div style={{ padding: '10px 12px', border: '1px solid var(--bd)', background: 'var(--bg-2)' }}>
+                <div style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 8 }}>
+                  Allow cross-origin requests from this dashboard
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--fg-2)', marginBottom: 8, lineHeight: 1.6 }}>
+                  By default Ollama blocks requests from browser origins. Start it with:
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <code style={{ fontSize: 11.5, color: 'var(--acc)', background: 'var(--bg)', padding: '4px 8px', flex: 1 }}>
+                    OLLAMA_ORIGINS=* ollama serve
+                  </code>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText('OLLAMA_ORIGINS=* ollama serve'); toast('Copied!'); }}
+                    style={{ padding: '4px 10px', fontSize: 11, border: '1px solid var(--bd)', background: 'transparent', color: 'var(--fg-2)', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                  >
+                    copy
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--fg-3)', marginTop: 8, lineHeight: 1.5 }}>
+                  Note: if you&apos;re using the Vercel-hosted backend, it cannot reach <code style={{ color: 'var(--acc)' }}>localhost</code>. Use a public Ollama URL or switch to Gemini.
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              onClick={() => { setAiSettings(aiSettings); setAiSaved(true); setTimeout(() => setAiSaved(false), 2000); toast('AI settings saved'); }}
+              style={{ padding: '5px 16px', fontSize: 12, border: '1px solid var(--acc)', background: 'transparent', color: 'var(--acc)', cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              save
+            </button>
+            {aiSaved && <span style={{ fontSize: 11, color: 'var(--acc)' }}>✓ saved</span>}
           </div>
         </Panel>
 
